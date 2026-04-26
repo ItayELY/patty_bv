@@ -1,7 +1,7 @@
 from typing import Dict
 
 from src.smt.SMTBoolVariable import SMTBoolVariable
-from src.smt.SMTNumericVariable import SMTNumericVariable
+from src.smt.SMTNumericVariable import SMTBVVariable, SMTNumericVariable
 from src.smt.SMTVariable import SMTVariable
 
 
@@ -11,11 +11,15 @@ class SMTSolution:
         self.__variables: Dict[SMTVariable, float] = dict()
 
     def addVariable(self, var: SMTVariable, value: float):
+        
         self.__variables[var] = value
 
     def getVariable(self, var: SMTVariable) -> float:
         node = self.__variables[var]
+        return node
         if isinstance(var, SMTNumericVariable):
+            return node
+        if isinstance(var, SMTBVVariable):
             return node
         if isinstance(var, SMTBoolVariable):
             raise NotImplemented("TODO")

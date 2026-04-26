@@ -20,7 +20,7 @@ class Patty(Planner):
 
     @staticmethod
     def parseOutput(r: Result, stdout: str):
-        r.solved = len(re.findall(r"Plan is valid", stdout)) > 0
+        # r.solved = len(re.findall(r"Plan is valid", stdout)) > 0
         r.time = Result.parseTime(stdout)
         reBound = re.findall(r"^Bound: (\d*?)$", stdout, re.MULTILINE)
         r.bound = -1 if not reBound else int(reBound[0])

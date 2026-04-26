@@ -41,7 +41,7 @@ class BinaryPredicate(Predicate):
         return bp
 
     @classmethod
-    def fromNode(cls, node: p.ModificationContext or p.ComparationContext or p.OperationContext) -> BinaryPredicate:
+    def fromNode(cls, node: p.ModificationContext or p.ComparationContext or p.OperationContext, bv = False) -> BinaryPredicate:
         bp = cls()
 
         if isinstance(node, p.NegatedComparationContext):

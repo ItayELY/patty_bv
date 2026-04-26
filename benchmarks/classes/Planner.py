@@ -18,15 +18,15 @@ class Planner:
         r.solver = self.name
         r.code = code
         r.cmd = cmd
-        r.timeout = r.code == 124
-        r.solved = r.code == 0
+        r.timeout = code == 124
+        r.solved = code == 0
         r.stdout = stdout
         self.parseOutput(r, stdout)
         if not r.timeout and r.solved:
             return r
         if not r.timeout and not r.solved:
             print(r.stdout)
-            logger.error(r.toJSON())
+            # logger.error(r.toJSON())
         else:
             r.solved = False
             r.time = timeout * 1000
@@ -36,11 +36,34 @@ class Planner:
         cmd: [str] = self.getCommand(domain, problem)
         output = ""
         command = ["timeout", str(timeout)] + ["time", "-p"] + cmd
+        # command = ["timeout", str(timeout)] + cmd
+
         print(" ".join(command))
         with Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as p:
             for line in iter(p.stdout.readline, b''):
                 output += line.decode('utf-8').rstrip() + "\n"
         return output, p.returncode, " ".join(cmd)
+    
+    def exec_windows(self, domain: str, problem: str, timeout: int):
+        cmd = self.getCommand(domain, problem)
+        output = ""
+
+        print(" ".join(cmd))
+
+        try:
+            res = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                timeout=timeout,     #  <-- THIS is the timeout!
+                text=True
+            )
+            output = res.stdout
+            return output, res.returncode, " ".join(cmd)
+
+        except subprocess.TimeoutExpired as e:
+            return e.stdout or "", -1, " ".join(cmd)
+
 
     def getCommand(self, domain: str, problem: str) -> [str]:
         raise NotImplemented()

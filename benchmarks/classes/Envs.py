@@ -4,10 +4,10 @@ import os
 class Envs:
 
     def __init__(self):
-        self.experiment = os.getenv("EXPERIMENT_NAME", "local")
+        self.experiment = os.getenv("EXPERIMENT_NAME", "AGAINST_BV")
         self.index = int(os.getenv("AWS_BATCH_JOB_ARRAY_INDEX", 0))
         self.instances = int(os.getenv("INSTANCES_PER_MACHINE", 10))
         self.startFrom = int(os.getenv("INSTANCES_START_FROM", 0))
-        self.timeout = int(os.getenv("TIMEOUT", 30))
+        self.timeout = int(os.getenv("TIMEOUT", 20))
         self.file = os.getenv("FILE", "benchmarks/instances-ipc.csv")
         self.isInsideAWS = "AWS_BATCH_JOB_ID" in os.environ

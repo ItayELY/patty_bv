@@ -1,0 +1,4 @@
+#!/bin/bash
+exec conda run -n patty python /project/main_random_second.py "$@"
+
+

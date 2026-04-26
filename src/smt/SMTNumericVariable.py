@@ -1,7 +1,9 @@
-from pysmt.shortcuts import Symbol
-from pysmt.typing import REAL, INT
+from pysmt.shortcuts import Symbol, BV
+from pysmt.typing import REAL, INT, BVType
 
 from src.smt.SMTVariable import SMTVariable
+BV_WIDTH = 10        # replaces --solve-int-as-bv=10
+BV_SIGNED = True     # True = signed, False = unsigned
 
 
 class SMTNumericVariable(SMTVariable):
@@ -23,3 +25,16 @@ class SMTIntVariable(SMTNumericVariable):
 class SMTRealVariable(SMTNumericVariable):
     def __init__(self, name: str):
         super().__init__(name, REAL)
+
+
+class SMTBVVariable(SMTVariable):
+    def __init__(self, name: str):
+        super().__init__()
+        self.expression = Symbol(name, BVType(BV_WIDTH))
+        self.type = "BV"
+
+    def const(self, value: int):
+        """
+        Create a BV constant of the same width.
+        """
+        return BV(value, self.width)

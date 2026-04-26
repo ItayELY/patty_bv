@@ -37,6 +37,16 @@ class TransitionVariables:
             variables[atom] = SMTBoolVariable(f"{atom}_{index}")
 
         return variables
+    
+    def __computeValueVariablesItay(self, index: int) -> Dict[Atom, SMTVariable]:
+        variables: Dict[Atom, SMTVariable] = dict()
+
+        for atom in self.pattern._Pattern__Order:
+            variables[atom] = SMTRealVariable(f"{atom}_{index}")
+        for atom in self.predicates:
+            variables[atom] = SMTBoolVariable(f"{atom}_{index}")
+
+        return variables
 
     def __computeActionVariables(self, index: int) -> Dict[Action, SMTVariable]:
         variables: Dict[Action, SMTVariable] = dict()
