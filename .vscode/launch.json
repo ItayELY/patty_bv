@@ -11,16 +11,16 @@
             "console": "integratedTerminal",
             "args": [
                 "-o",
-                "files/ipc-2023/farmland/domain.pddl",
+                "files/tpp/domain.pddl",
                 "-f",
-                "files/ipc-2023/farmland/instances/instance_6_400_1229.pddl",
+                "files/tpp/instances/p02.pddl",
                 "--pattern",
                 "arpg",
                 "--save-smt", "file_smt",
                 "-pp",
                 "-v",
                 "4",
-                "--solver", "z3",
+                "--solver", "bitwuzla",
 
             ]
         }

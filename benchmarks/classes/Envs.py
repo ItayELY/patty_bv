@@ -5,7 +5,7 @@ class Envs:
 
     def __init__(self):
         self.experiment = os.getenv("EXPERIMENT_NAME", "AGAINST_BV")
-        self.index = int(os.getenv("AWS_BATCH_JOB_ARRAY_INDEX", 0))
+        self.index = int(os.getenv("WORKER_INDEX", os.getenv("AWS_BATCH_JOB_ARRAY_INDEX", 0)))
         self.instances = int(os.getenv("INSTANCES_PER_MACHINE", 10))
         self.startFrom = int(os.getenv("INSTANCES_START_FROM", 0))
         self.timeout = int(os.getenv("TIMEOUT", 20))

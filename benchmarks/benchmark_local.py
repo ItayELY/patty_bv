@@ -18,7 +18,7 @@ from classes.Result import Result
 
 PLANNERS: Dict[str, Planner] = {
     "PATTY": Patty("PATTY", "arpg", solver="cvc5", encoding="non-linear"),
-    "PATTY-BV": pattyBV("PATTY-BV", "arpg", solver="cvc5", encoding="non-linear"),
+    "PATTY-BV": pattyBV("PATTY-BV", "arpg", solver="bitwuzla", encoding="non-linear"),
     # "PATTY-R": pattyAllRandom("PATTY-R", "random", solver="z3", encoding="non-linear"),
     # "SPRINGROLL": SpringRoll(),
     # "RANTANPLAN": Patty("RANTANPLAN", "arpg", solver="z3", encoding="non-linear", rollBound=1, hasEffectAxioms=True),
@@ -37,16 +37,23 @@ def main():
     envs = Envs()
     envs.isInsideAWS = False   # make sure nothing AWS-specific runs
 
-    # optional: simple local log file instead of CloudLogger
-    log_file = open(f"{envs.experiment}.log", "a", encoding="utf-8")
+    # Per-worker log file avoids concurrent write conflicts on a cluster
+    log_suffix = f"_{envs.index}" if envs.index > 0 else ""
+    log_file = open(f"{envs.experiment}{log_suffix}.log", "a", encoding="utf-8")
 
     # --- read CSV of instances ---
     with open(envs.file, "r") as f:
         csv = f.read().strip()
 
-    instances = [
+    all_instances = [
         line.split(",") for line in csv.split("\n") if line.strip()
     ]
+
+    # Slice this worker's chunk: set INSTANCES_PER_MACHINE + WORKER_INDEX on the cluster
+    start = envs.index * envs.instances
+    instances = all_instances[start: start + envs.instances]
+    print(f"Worker {envs.index}: processing instances {start}–{start + len(instances) - 1} "
+          f"of {len(all_instances)} total")
 
     # --- run each instance locally ---
     for el in instances:

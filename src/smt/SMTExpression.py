@@ -334,10 +334,10 @@ class SMTExpression:
 
     @classmethod
     def fromPddl(cls, predicate: BinaryPredicate or Literal or Constant,
-                 variables: Dict[Atom, SMTExpression], bv=False, width = 0) -> SMTExpression or float:
+                 variables: Dict[Atom, SMTExpression], bv=False, width = 0, scale_factor=1) -> SMTExpression or float:
         if isinstance(predicate, BinaryPredicate):
-            lhs = SMTExpression.fromPddl(predicate.lhs, variables, bv=bv, width=width)
-            rhs = SMTExpression.fromPddl(predicate.rhs, variables, bv=bv, width=width)
+            lhs = SMTExpression.fromPddl(predicate.lhs, variables, bv=bv, width=width, scale_factor=scale_factor)
+            rhs = SMTExpression.fromPddl(predicate.rhs, variables, bv=bv, width=width, scale_factor=scale_factor)
             result = SMTExpression.opByString(predicate.operator, lhs, rhs)
             return result
         if isinstance(predicate, Literal):
@@ -345,7 +345,7 @@ class SMTExpression:
         if isinstance(predicate, Constant):
             if not bv:
                 return predicate.value
-            int_val = int(float(predicate.value))
+            int_val = round(float(predicate.value) * scale_factor)
             # wrapper:
             expr = SMTExpression()
             from pysmt.shortcuts import BV

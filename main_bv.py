@@ -7,10 +7,8 @@ from src.pddl.NumericPlan import NumericPlan
 from src.pddl.Operation import Operation
 from src.pddl.Problem import Problem
 from src.plan.PDDL2SMTBV import PDDL2SMTBV
-from src.smt.SMTSolverBV_S import SMTSolver
 
 from src.plan.PatternBV import Pattern
-# from src.smt.SMTSolver import SMTSolver
 from src.utils.Arguments import Arguments
 from src.utils.LogPrint import LogPrint, LogPrintLevel
 from src.utils.TimeStat import TimeStat
@@ -30,6 +28,11 @@ def main():
     args = Arguments()
     if args.isHelp:
         exit(0)
+
+    if args.solver == "bitwuzla":
+        from src.smt.SMTSolverBV_Bitwuzla import SMTSolver
+    else:
+        from src.smt.SMTSolverBV_S import SMTSolver
 
     try:
 
@@ -114,15 +117,21 @@ def main():
                 for idx, p in enumerate(plan):
                     print(f"-------Step {idx}-------")
                     console.log(p.toValString(), LogPrintLevel.PLAN)
-                    # isValid = p.validate(problem, avoidRaising=True, logger=console)
-                    # if isValid:
-                        # console.log("Plan is valid", LogPrintLevel.PLAN)
-                        # if args.savePlan:
-                            # fn = args.savePlan if args.savePlan != "PROBLEM" else args.problem + ".plan"
-                            # with open(fn, "w") as f:
-                                # f.write(p.toValString())
-                    # else:
-                        # console.log("Plan is NOT valid", LogPrintLevel.PLAN)
+
+                wholePlan = NumericPlan()
+                for p in plan:
+                    for action in p:
+                        wholePlan.addRepeatedAction(action, 1)
+
+                isValid = wholePlan.validate(problem, avoidRaising=True, logger=console)
+                if isValid:
+                    console.log("Plan is valid", LogPrintLevel.PLAN)
+                    if args.savePlan:
+                        fn = args.savePlan if args.savePlan != "PROBLEM" else args.problem + ".plan"
+                        with open(fn, "w") as f:
+                            f.write(wholePlan.toValString())
+                else:
+                    console.log("Plan is NOT valid", LogPrintLevel.PLAN)
                 console.log(f"Bound: {bound}", LogPrintLevel.STATS)
 
                 break

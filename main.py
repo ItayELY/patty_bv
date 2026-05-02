@@ -71,7 +71,7 @@ def main():
             from pysmt.logics import QF_LIA
 
             ts.start(f"Solving Bound {bound}", console=console)
-            solver: SMTSolver = SMTSolver(pddl2smt, solver=args.solver)
+            solver: SMTSolver = SMTSolver(pddl2smt, solver=(args.solver if args.solver != 'bitwuzla' else 'cvc5'))
             # pddl2smt.printRules
             plan: NumericPlan
             if args.deep:
@@ -98,15 +98,21 @@ def main():
                 for idx, p in enumerate(plan):
                     print(f"-------Step {idx}-------")
                     console.log(p.toValString(), LogPrintLevel.PLAN)
-                    # isValid = p.validate(problem, avoidRaising=True, logger=console)
-                    # if isValid:
-                        # console.log("Plan is valid", LogPrintLevel.PLAN)
-                        # if args.savePlan:
-                            # fn = args.savePlan if args.savePlan != "PROBLEM" else args.problem + ".plan"
-                            # with open(fn, "w") as f:
-                                # f.write(p.toValString())
-                    # else:
-                        # console.log("Plan is NOT valid", LogPrintLevel.PLAN)
+                wholePlan = NumericPlan()
+                for p in plan:
+                    for action in p:
+                        wholePlan.addRepeatedAction(action, 1)
+
+                isValid = wholePlan.validate(problem, avoidRaising=True, logger=console)
+                if isValid:
+                    console.log("Plan is valid", LogPrintLevel.PLAN)
+                    if args.savePlan:
+                        fn = args.savePlan if args.savePlan != "PROBLEM" else args.problem + ".plan"
+                        with open(fn, "w") as f:
+                            f.write(wholePlan.toValString())
+                else:
+                    console.log("Plan is NOT valid", LogPrintLevel.PLAN)
+                console.log(f"Bound: {bound}", LogPrintLevel.STATS)
                 console.log(f"Bound: {bound}", LogPrintLevel.STATS)
 
                 break
