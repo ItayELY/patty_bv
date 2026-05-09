@@ -2,6 +2,7 @@ from enum import IntEnum
 
 
 class LogPrintLevel(IntEnum):
+    MUTED = 0  # No output
     STEPS = 1  # The steps that compose the planning (e.g. "Grounding...", "Solving...")
     STATS = 2  # All the stats of the planning
     TIMES = 3  # The timings of the various part of the plan
@@ -11,10 +12,10 @@ class LogPrintLevel(IntEnum):
     def getLevels():
         return """
          LEVEL 0 - Muted
-         LEVEL 1 - Steps (The steps that compose the planning (e.g. "Grounding...", "Solving...") + Previous levels 
-         LEVEL 2 - Stats (All the stats of the planning) + Previous levels 
-         LEVEL 3 - Timings (The timings of the various part of the plan) + Previous levels 
-         LEVEL 4 (Default) - Plan (the solution) + Previous levels 
+         LEVEL 1 - Steps (The steps that compose the planning (e.g. "Grounding...", "Solving...") + Previous levels
+         LEVEL 2 - Stats (All the stats of the planning) + Previous levels
+         LEVEL 3 - Timings (The timings of the various part of the plan) + Previous levels
+         LEVEL 4 (Default) - Plan (the solution) + Previous levels
         """
 
     @staticmethod

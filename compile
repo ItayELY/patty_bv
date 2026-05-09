@@ -1,0 +1,15 @@
+#!/bin/bash
+set -e
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+apt-get update -q
+apt-get install -y python3 python3-pip python3-venv
+
+python3 -m venv "$DIR/.venv"
+"$DIR/.venv/bin/pip" install --upgrade pip
+"$DIR/.venv/bin/pip" install \
+    "pysmt>=0.9.5" \
+    "antlr4-python3-runtime==4.12.0" \
+    "sympy>=1.5" \
+    "bitwuzla>=0.9.0"

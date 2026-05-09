@@ -2,8 +2,8 @@
 .idea/
 
 src/__pycache__/
-
 src/plan/__pycache__/
+**/__pycache__/
 
 *.pyc
 
@@ -17,5 +17,19 @@ benchmarks/planners/cplex/installer.bin
 ..bfg-report/
 
 *.smt
-
 *.pdf
+
+# Container build artifacts
+planner.sif
+planner_sandbox/
+
+# Python environments
+.venv/
+venv/
+
+# Large data files
+*.zip
+*.log
+*.ipynb
+*.csv
+bitwuzla/

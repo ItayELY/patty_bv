@@ -1,0 +1,16 @@
+#!/bin/bash
+# IPC 2026 Numeric - Agile Track - LNP fragment
+
+DOMAIN="$(realpath "$1")"
+PROBLEM="$(realpath "$2")"
+OUTPUT="$(realpath "$3")"
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$DIR"
+
+"$DIR/.venv/bin/python3" main_bv.py \
+    -o "$DOMAIN" \
+    -f "$PROBLEM" \
+    --save-plan "$OUTPUT" \
+    --solver bitwuzla \
+    -v 0

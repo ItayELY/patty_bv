@@ -40,7 +40,7 @@ class Arguments:
         self.bound = args.bound
         self.verboseLevel = LogPrintLevel(args.verboseLevel)
         self.deep = args.deep
-        self.printPattern =True# args.pp
+        self.printPattern = args.pp
         self.printARPG = True
         self.pattern = args.pattern
         self.solver = args.solver

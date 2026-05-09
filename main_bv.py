@@ -115,7 +115,7 @@ def main():
                     LogPrintLevel.PLAN)
             else:
                 for idx, p in enumerate(plan):
-                    print(f"-------Step {idx}-------")
+                    console.log(f"-------Step {idx}-------", LogPrintLevel.STEPS)
                     console.log(p.toValString(), LogPrintLevel.PLAN)
 
                 wholePlan = NumericPlan()
@@ -141,8 +141,7 @@ def main():
         ts.end("Overall")
         console.log(str(ts), LogPrintLevel.TIMES)
 
-    except:
-        print("Something went wrong.")
+    except Exception:
         traceback.print_exc()
 
 
