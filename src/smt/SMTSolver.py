@@ -17,11 +17,12 @@ class SMTSolver:
         self.variables: Set[SMTVariable] = set()
         self.assertions: List[SMTExpression] = list()
         self.pddl2smt: PDDL2SMT = pddl2smt
+        # solver = ("cvc5")#, {"solve-int-as-bv": "10"})
 
         self.solver: Portfolio = Portfolio([solver],
                                            logic=QF_LRA,
-                                           incremental=True,
-                                           generate_models=True)
+                                           incremental=False, # false for cvc5 BV #True,
+                                           generate_models=True,)
 
         if self.pddl2smt:
             self.addAssertions(self.pddl2smt.rules)
@@ -68,7 +69,7 @@ class SMTSolver:
         if not solution:
             return False
         plan = self.pddl2smt.getPlanFromSolution(solution)
-        plan.quality = plan.getMetric(self.pddl2smt.problem)
+        # plan.quality = plan.getMetric(self.pddl2smt.problem)
 
         return plan
 

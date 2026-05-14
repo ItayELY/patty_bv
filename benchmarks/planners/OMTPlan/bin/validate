@@ -1,2 +1,0 @@
-#!/bin/sh
-~/Bin/val-dir/Validate $@

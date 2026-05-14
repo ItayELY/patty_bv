@@ -1,0 +1,9 @@
+#!/bin/bash
+
+DOMAIN=$(realpath "$1")
+PROBLEM=$(realpath "$2")
+PLAN=$(realpath "$3")
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+"$DIR/planner.sif" -o "$DOMAIN" -f "$PROBLEM" --save-plan "$PLAN" --solver bitwuzla -v 0

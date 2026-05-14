@@ -88,7 +88,7 @@ class Action(Operation):
 
             # Additive Effects Transformation
             if effect.operator == "assign":
-                effect = BinaryPredicate.additiveEffectsTransformation(effect)
+                 effect = BinaryPredicate.additiveEffectsTransformation(effect)
 
             atom = effect.getAtom()
             interval = MooreInterval()

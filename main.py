@@ -8,12 +8,12 @@ from src.pddl.Operation import Operation
 from src.pddl.Problem import Problem
 from src.plan.PDDL2SMT import PDDL2SMT
 from src.plan.Pattern import Pattern
-from src.smt.SMTSolver import SMTSolver
+from src.smt.SMTSolver import SMTSolver 
 from src.utils.Arguments import Arguments
 from src.utils.LogPrint import LogPrint, LogPrintLevel
 from src.utils.TimeStat import TimeStat
 
-
+# -o patty\files\tpp\domain.pddl -f patty\files\tpp\instances\p05.pddl
 def main():
     args = Arguments()
     if args.isHelp:
@@ -47,8 +47,8 @@ def main():
         if args.printPattern:
             console.log("Pattern: " + str(pattern), LogPrintLevel.PLAN)
 
-        if args.printARPG:
-            console.log(str(gDomain.arpg), LogPrintLevel.PLAN)
+        # if args.printARPG:
+        #     console.log(str(gDomain.arpg), LogPrintLevel.PLAN)
 
         while bound <= bMax:
 
@@ -64,10 +64,11 @@ def main():
                 hasEffectAxioms=args.hasEffectAxioms
             )
             ts.end(f"Conversion to SMT at bound {bound}", console=console)
+            from pysmt.logics import QF_LIA
 
             ts.start(f"Solving Bound {bound}", console=console)
-            solver: SMTSolver = SMTSolver(pddl2smt, solver=args.solver)
-
+            solver: SMTSolver = SMTSolver(pddl2smt, solver=(args.solver if args.solver != 'bitwuzla' else 'cvc5'))
+            # pddl2smt.printRules
             plan: NumericPlan
             if args.deep:
                 plan = solver.optimizeBinary()
@@ -90,16 +91,24 @@ def main():
                     f"NO SOLUTION: A solution could not be found with bound {bound}. Try to increase the bound",
                     LogPrintLevel.PLAN)
             else:
-                console.log(plan.toValString(), LogPrintLevel.PLAN)
-                isValid = plan.validate(problem, avoidRaising=True, logger=console)
+                for idx, p in enumerate(plan):
+                    print(f"-------Step {idx}-------")
+                    console.log(p.toValString(), LogPrintLevel.PLAN)
+                wholePlan = NumericPlan()
+                for p in plan:
+                    for action in p:
+                        wholePlan.addRepeatedAction(action, 1)
+
+                isValid = wholePlan.validate(problem, avoidRaising=True, logger=console)
                 if isValid:
                     console.log("Plan is valid", LogPrintLevel.PLAN)
                     if args.savePlan:
                         fn = args.savePlan if args.savePlan != "PROBLEM" else args.problem + ".plan"
                         with open(fn, "w") as f:
-                            f.write(plan.toValString())
+                            f.write(wholePlan.toValString())
                 else:
                     console.log("Plan is NOT valid", LogPrintLevel.PLAN)
+                console.log(f"Bound: {bound}", LogPrintLevel.STATS)
                 console.log(f"Bound: {bound}", LogPrintLevel.STATS)
 
                 break
@@ -116,3 +125,17 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# z3:
+'''
+Bound: 3
+Grounding: 111ms
+Conversion to SMT at bound 1: 189ms
+Solving Bound 1: 766ms
+Conversion to SMT at bound 2: 372ms
+Solving Bound 2: 967ms
+Conversion to SMT at bound 3: 512ms
+Solving Bound 3: 2930ms
+Overall: 7322ms
+
+'''

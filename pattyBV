@@ -1,0 +1,2 @@
+#!/bin/bash
+      conda run -n pattyBV python /project/main_bv.py "$@"

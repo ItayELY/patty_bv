@@ -161,7 +161,7 @@ class PDDL2SMT:
                         rules.append(stepVars.deltaVariables[action][v] == d_bv.AND(b_n == 0))
                     else:
                         stepVars.deltaVariables[action][v] = d_bv.AND(b_n == 0)
-
+                
             # Case c) Numeric increases or decreases
             if not prevAction.hasNonSimpleLinearIncrement(self.encoding):
                 modifications = [(+1, prevAction.getIncreases()), (-1, prevAction.getDecreases())]
@@ -353,21 +353,27 @@ class PDDL2SMT:
         return string
 
     def getPlanFromSolution(self, solution: SMTSolution) -> NumericPlan:
-        plan = NumericPlan()
+        step_plans = []
+        
 
         if not solution:
-            return plan
+            return NumericPlan()
 
         for i in range(1, self.bound + 1):
+            plan = NumericPlan()
             stepVar = self.transitionVariables[i]
             for a in self.pattern:
                 if a.isFake:
                     continue
+                # val = solution.getValue(stepVar.actionVariables[a].expression)
+                # repetitions = val.constant_value() * a.linearizationTimes
+
                 repetitions = int(str(solution.getVariable(stepVar.actionVariables[a]))) * a.linearizationTimes
                 if repetitions > 0:
                     plan.addRepeatedAction(a.linearizationOf, repetitions)
+            step_plans.append(plan)
 
-        return plan
+        return step_plans
 
     def getNVars(self):
         variables = set()

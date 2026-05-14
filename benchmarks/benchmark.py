@@ -4,11 +4,14 @@ import traceback
 
 import os
 
-import boto3
+# import boto3
 import time
+import boto3
 from botocore.config import Config
 from typing import Dict
 
+from classes.pattySecondRandom import pattySecondRandom
+from classes.pattyAllRandom import pattyAllRandom 
 from classes.CloudLogger import CloudLogger
 from classes.ENHSP import ENHSP
 from classes.Envs import Envs
@@ -26,20 +29,22 @@ my_config = Config(
 
 PLANNERS: Dict[str, Planner] = {
     "PATTY": Patty("PATTY", "arpg", solver="z3", encoding="non-linear"),
-    "PATTY-R": Patty("PATTY-R", "random", solver="z3", encoding="non-linear"),
-    "SPRINGROLL": SpringRoll(),
-    "RANTANPLAN": Patty("RANTANPLAN", "arpg", solver="z3", encoding="non-linear", rollBound=1, hasEffectAxioms=True),
-    "ENHSP-HADD": ENHSP("sat-hadd"),
-    "ENHSP-HRADD": ENHSP("sat-hradd"),
-    "ENHSP-HMRP": ENHSP("sat-hmrphj"),
-    "METRIC-FF": MetricFF(),
-    "NFD": NFD(),
-    "OMT": OMT(),
+    "PATTY-R-FROM-SECOND": pattySecondRandom("PATTY-R-FROM-SECOND", "arpg", solver="z3", encoding="non-linear"),
+    "PATTY-R": pattyAllRandom("PATTY-R", "random", solver="z3", encoding="non-linear"),
+    # "SPRINGROLL": SpringRoll(),
+    # "RANTANPLAN": Patty("RANTANPLAN", "arpg", solver="z3", encoding="non-linear", rollBound=1, hasEffectAxioms=True),
+    # "ENHSP-HADD": ENHSP("sat-hadd"),
+    # "ENHSP-HRADD": ENHSP("sat-hradd"),
+    # "ENHSP-HMRP": ENHSP("sat-hmrphj"),
+    # "METRIC-FF": MetricFF(),
+    # "NFD": NFD(),
+    # "OMT": OMT(),
 }
 
 
 def main():
     print("Started...")
+
     s3 = boto3.client('s3', config=my_config)
 
     envs = Envs()
@@ -58,11 +63,25 @@ def main():
         b = min(envs.startFrom + ((envs.index + 1) * envs.instances), len(instances))
         instances = instances[a:b]
 
+    
     for el in instances:
-        planner = PLANNERS[el[0]]
-        benchmark = el[1]
-        domainFile = el[2]
-        problemFile = el[3]
+        planner_name, benchmark, domainFile, problemFile = el
+        try:
+            if planner_name == 'NFD':
+                planner_name = 'PATTY-R-FROM-SECOND'
+                planner = PLANNERS["PATTY-R-FROM-SECOND"]
+            elif planner_name == 'ENHSP-HADD':
+                planner_name = 'PATTY-R'
+                planner = PLANNERS["PATTY-R"]
+            elif planner_name == "PATTY":
+                planner_name = 'PATTY'
+                planner = PLANNERS["PATTY"]
+            else:
+                continue
+                # planner = PLANNERS[planner_name]
+        except:
+            continue
+        print(f"\n=== Running {planner_name} on {domainFile}/{problemFile} ===")
 
         try:
             if envs.isInsideAWS:

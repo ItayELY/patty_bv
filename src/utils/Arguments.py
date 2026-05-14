@@ -41,7 +41,7 @@ class Arguments:
         self.verboseLevel = LogPrintLevel(args.verboseLevel)
         self.deep = args.deep
         self.printPattern = args.pp
-        self.printARPG = args.arpg
+        self.printARPG = True
         self.pattern = args.pattern
         self.solver = args.solver
         self.encoding = args.encoding

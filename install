@@ -4,3 +4,23 @@ echo "#!/bin/bash
       conda run -n patty python $(pwd)/main.py \$@" > patty
 
 chmod +x ./patty
+
+
+
+echo "#!/bin/bash
+      conda run -n pattyAllRandom python $(pwd)/main_all_random.py \$@" > pattyAllRandom
+
+chmod +x ./pattyAllRandom
+
+#!/bin/bash
+
+echo "#!/bin/bash
+      conda run -n pattySecondRandom python $(pwd)/main_random_second.py \$@" > pattySecondRandom
+
+chmod +x ./pattySecondRandom
+
+
+echo "#!/bin/bash
+      conda run -n pattyBV python $(pwd)/main_bv.py \$@" > pattyBV
+
+chmod +x ./pattyBV
