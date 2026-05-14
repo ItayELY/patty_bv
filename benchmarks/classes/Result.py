@@ -50,9 +50,9 @@ class Result:
 
     @classmethod
     def parseTime(cls, stdout):
-        reTime = re.findall(r"^real (.*?)$", stdout, re.MULTILINE)
+        reTime = re.findall(r"^Overall: (\d+)ms", stdout, re.MULTILINE)
         time = reTime[0] if len(reTime) > 0 else 0
-        return float(time) * 1000
+        return float(time)
 
     def __str__(self):
         row = [

@@ -11,9 +11,9 @@
             "console": "integratedTerminal",
             "args": [
                 "-o",
-                "files/tpp/domain.pddl",
+                "files/ipc-2023/sailing/domain.pddl",
                 "-f",
-                "files/tpp/instances/p02.pddl",
+                "files/ipc-2023/sailing/instances/instance_1_4_1229.pddl",
                 "--pattern",
                 "arpg",
                 "--save-smt", "file_smt",

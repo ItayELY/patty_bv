@@ -63,10 +63,6 @@ def main():
                 rollBound=args.rollBound,
                 hasEffectAxioms=args.hasEffectAxioms
             )
-            print("******* Rules")
-            for r in pddl2smt.rules[-5:]: # Look at the goal and final effects
-                print(r.expression.serialize())
-            print("******* Rules")
             ts.end(f"Conversion to SMT at bound {bound}", console=console)
             from pysmt.logics import QF_LIA
 

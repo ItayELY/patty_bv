@@ -51,7 +51,7 @@ def main():
 
     # Slice this worker's chunk: set INSTANCES_PER_MACHINE + WORKER_INDEX on the cluster
     start = envs.index * envs.instances
-    instances = all_instances[start: start + envs.instances]
+    instances = all_instances#[start: start + envs.instances]
     print(f"Worker {envs.index}: processing instances {start}–{start + len(instances) - 1} "
           f"of {len(all_instances)} total")
 
@@ -65,6 +65,9 @@ def main():
             elif planner_name == 'ENHSP-HADD':
                 planner_name = 'PATTY-R'
                 planner = PLANNERS["PATTY-R"]
+            elif planner_name == 'PATTY-BV':
+                planner_name = 'PATTY-BV'
+                planner = PLANNERS["PATTY-BV"]
             elif planner_name == "PATTY":
                 planner_name = 'PATTY'
                 planner = PLANNERS["PATTY"]
