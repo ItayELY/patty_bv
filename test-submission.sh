@@ -2,14 +2,14 @@
 # End-to-end submission test for IPC 2026 Numeric Agile Track.
 #
 # Tests both configurations:
-#   - PATTY-BV    (Recipe       / --solver bitwuzla)
-#   - PATTY-cvc5  (Recipe-patty / --solver cvc5)
+#   - PATTY-BV   (Recipe       / --solver bitwuzla)
+#   - PATTY-z3   (Recipe-patty / --solver z3)
 #
 # Usage:
 #   ./test-submission.sh              # Apptainer mode (mirrors IPC environment)
 #   ./test-submission.sh --local      # local .venv mode (no container build needed)
 #   ./test-submission.sh --bv-only    # only test PATTY-BV
-#   ./test-submission.sh --patty-only # only test PATTY-cvc5
+#   ./test-submission.sh --patty-only # only test PATTY-z3
 
 set -uo pipefail
 
@@ -74,30 +74,29 @@ run_instance() {
 }
 
 # ─── Apptainer helpers ────────────────────────────────────────────────────────
-build_sif() {
-    local recipe="$1" sif="$2"
-    echo "  Building $(basename "$sif") from $recipe ..."
-    if ! apptainer build "$sif" "$recipe"; then
-        red "  ERROR: failed to build $sif"
+# Build a sandbox directory (no FUSE/squashfuse required, works inside Docker).
+build_sandbox() {
+    local recipe="$1" sandbox="$2"
+    echo "  Building sandbox from $(basename "$recipe") ..."
+    if ! apptainer build --sandbox "$sandbox" "$recipe"; then
+        red "  ERROR: failed to build sandbox from $recipe"
         exit 1
     fi
-    echo "  Built $sif"
+    echo "  Built $sandbox"
 }
 
 test_apptainer() {
-    local config="$1" sif="$2" extra_args="$3"
+    local config="$1" sandbox="$2"
     echo ""
     echo "=== $config (Apptainer) ==="
     for entry in "${INSTANCES[@]}"; do
         read -r domain problem label <<< "$entry"
         local plan; plan="$(mktemp /tmp/patty_plan_XXXXXX.pddl)"
+        # --bind exposes the project files inside the container at the same path
         # shellcheck disable=SC2086
         local result; result=$(run_instance "$plan" \
-            apptainer run "$sif" \
-                -o "$SCRIPT_DIR/$domain" \
-                -f "$SCRIPT_DIR/$problem" \
-                --save-plan "$plan" \
-                -v 0 $extra_args)
+            apptainer run --bind "$SCRIPT_DIR:$SCRIPT_DIR" "$sandbox" \
+                "$SCRIPT_DIR/$domain" "$SCRIPT_DIR/$problem" "$plan")
         rm -f "$plan"
         case "$result" in
             ok:*)    record_result "PASS"    "$config" "$label" "${result#ok:}" ;;
@@ -138,7 +137,7 @@ test_local() {
 
 # ─── main ─────────────────────────────────────────────────────────────────────
 echo "IPC 2026 Numeric — Submission Test"
-echo "Mode: $( $LOCAL && echo 'local venv' || echo 'Apptainer' )"
+echo "Mode: $( $LOCAL && echo 'local venv' || echo 'Apptainer (sandbox)' )"
 echo "Timeout per instance: ${TIMEOUT}s"
 
 if $LOCAL; then
@@ -150,18 +149,18 @@ else
         exit 1
     fi
 
-    TMPDIR_SIFS="$(mktemp -d)"
-    trap 'rm -rf "$TMPDIR_SIFS"' EXIT
-    BV_SIF="$TMPDIR_SIFS/patty-bv.sif"
-    PATTY_SIF="$TMPDIR_SIFS/patty-cvc5.sif"
+    TMPDIR_BOXES="$(mktemp -d)"
+    trap 'rm -rf "$TMPDIR_BOXES"' EXIT
+    BV_BOX="$TMPDIR_BOXES/patty-bv"
+    PATTY_BOX="$TMPDIR_BOXES/patty-z3"
 
     echo ""
     echo "=== Building containers ==="
-    $RUN_BV    && build_sif "$SCRIPT_DIR/Recipe"        "$BV_SIF"
-    $RUN_PATTY && build_sif "$SCRIPT_DIR/Recipe-patty"  "$PATTY_SIF"
+    $RUN_BV    && build_sandbox "$SCRIPT_DIR/Recipe"        "$BV_BOX"
+    $RUN_PATTY && build_sandbox "$SCRIPT_DIR/Recipe-patty"  "$PATTY_BOX"
 
-    $RUN_BV    && test_apptainer "PATTY-BV"  "$BV_SIF"    "--solver bitwuzla"
-    $RUN_PATTY && test_apptainer "PATTY-z3"  "$PATTY_SIF" "--solver z3"
+    $RUN_BV    && test_apptainer "PATTY-BV" "$BV_BOX"
+    $RUN_PATTY && test_apptainer "PATTY-z3" "$PATTY_BOX"
 fi
 
 # ─── summary ──────────────────────────────────────────────────────────────────

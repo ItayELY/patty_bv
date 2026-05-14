@@ -20,4 +20,5 @@ From: ubuntu:24.04
         "z3-solver"
 
 %runscript
-    exec /opt/patty/.venv/bin/python3 /opt/patty/main.py --solver z3 "$@"
+    exec /opt/patty/.venv/bin/python3 /opt/patty/main.py \
+        --solver z3 -o "$1" -f "$2" --save-plan "$3" -v 0

@@ -6,4 +6,4 @@ PLAN=$(realpath "$3")
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-"$DIR/planner.sif" -o "$DOMAIN" -f "$PROBLEM" --save-plan "$PLAN" --solver z3 -v 0
+"$DIR/planner.sif" "$DOMAIN" "$PROBLEM" "$PLAN"
