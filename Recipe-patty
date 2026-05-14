@@ -16,8 +16,8 @@ From: ubuntu:24.04
     /opt/patty/.venv/bin/pip install \
         "pysmt>=0.9.5" \
         "antlr4-python3-runtime==4.12.0" \
-        "sympy>=1.5"
-    /opt/patty/.venv/bin/pysmt-install --cvc5 --confirm
+        "sympy>=1.5" \
+        "z3-solver"
 
 %runscript
-    exec /opt/patty/.venv/bin/python3 /opt/patty/main.py "$@"
+    exec /opt/patty/.venv/bin/python3 /opt/patty/main.py --solver z3 "$@"

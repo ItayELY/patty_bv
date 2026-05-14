@@ -20,4 +20,4 @@ From: ubuntu:24.04
         "bitwuzla>=0.9.0"
 
 %runscript
-    exec /opt/patty/.venv/bin/python3 /opt/patty/main_bv.py "$@"
+    exec /opt/patty/.venv/bin/python3 /opt/patty/main_bv.py --solver bitwuzla "$@"
