@@ -61,11 +61,9 @@ class NumericPlan:
 
     def toValString(self):
         string = ""
-        t = 0
         for a in self.__plan:
             for i in range(0, a[1]):
-                string += f"{t}: ({a[0]})\n"
-                t += 1
+                string += f"({a[0]})\n"
         return string
 
     def printWithRepetitions(self):
