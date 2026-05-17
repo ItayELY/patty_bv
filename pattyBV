@@ -1,2 +1,3 @@
 #!/bin/bash
-conda run -n patty_itay python /project/main_bv.py "$@"
+DIR="$(dirname "$(readlink -f "$0")")"
+conda run -n patty_itay python "$DIR/main_bv.py" "$@"

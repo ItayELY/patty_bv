@@ -1,9 +1,14 @@
+import os
 import re
 
 from classes.Planner import Planner
 from classes.Result import Result
 
 NAME = "pattyBV"
+
+def _pattybv_exe():
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    return os.path.join(project_root, "pattyBV")
 
 
 class pattyBV(Planner):
@@ -36,7 +41,7 @@ class pattyBV(Planner):
         return r
 
     def getCommand(self, domain: str, problem: str):
-        cmd = ["pattyBV", "-o", domain, "-f", problem, "-pp", "--pattern", self.pattern, "--solver", self.solver,
+        cmd = [_pattybv_exe(), "-o", domain, "-f", problem, "-pp", "--pattern", self.pattern, "--solver", self.solver,
                "--encoding", self.encoding, "--roll-bound", str(self.rollBound)]
         if self.hasEffectAxioms:
             cmd += ["--effect-axioms"]
