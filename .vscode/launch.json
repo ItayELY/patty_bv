@@ -20,7 +20,7 @@
                 "-pp",
                 "-v",
                 "4",
-                "--solver", "bitwuzla",
+                "--solver", "cvc5",
 
             ]
         }

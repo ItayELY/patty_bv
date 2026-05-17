@@ -1,9 +1,9 @@
-from ctypes.wintypes import BOOL
 from fractions import Fraction
-from math import gcd as _gcd
+from math import gcd as _gcd, log2, ceil
 from typing import List, Dict, Set
 
-from pysmt.shortcuts import TRUE, FALSE
+from pysmt.shortcuts import TRUE, FALSE, BVZExt
+from pysmt.typing import BVType
 
 from src.pddl.Action import Action
 from src.pddl.Atom import Atom
@@ -55,15 +55,39 @@ def _compute_scale_factor(domain, problem):
     return scale
 
 
+def _compute_min_width(domain, problem, scale_factor):
+    consts = []
+    for action in domain.actions:
+        _collect_consts(action.preconditions, consts)
+        for eff in action.effects:
+            _collect_consts(eff, consts)
+    for assignment in problem.init:
+        _collect_consts(assignment, consts)
+    _collect_consts(problem.goal, consts)
+
+    if not consts:
+        return 15
+
+    max_val = max(abs(Fraction(str(v)) * scale_factor) for v in consts)
+    if max_val < 1:
+        return 15
+
+    # +1 for signed bit, +1 safety margin
+    bits = int(max_val).bit_length() + 2
+    return max(bits, 10)
+
+
 def to_bv(value, width):
     if value < 0:
         value = (1 << width) + value
     return BV(value, width)
+
+
 class PDDL2SMTBV:
     domain: GroundedDomain
     problem: Problem
 
-    def __init__(self, domain: GroundedDomain, problem: Problem, pattern: Pattern, bound: int, encoding="non-linear", width = 30, max_actions = 50,
+    def __init__(self, domain: GroundedDomain, problem: Problem, pattern: Pattern, bound: int, encoding="non-linear", width=None, max_actions=50,
                  binaryActions=10, rollBound=0, hasEffectAxioms=False):
         self.domain = domain
         self.problem = problem
@@ -71,9 +95,11 @@ class PDDL2SMTBV:
         self.encoding = encoding
         self.rollBound = rollBound
         self.hasEffectAxioms = hasEffectAxioms
-        self.width = width
         self.max_actions = max_actions
         self.scale_factor = _compute_scale_factor(domain, problem)
+        self.width = width if width is not None else _compute_min_width(domain, problem, self.scale_factor)
+        # action counts are small (bounded by max_actions); use a narrow BV to keep solver fast
+        self.action_width = max(int(max_actions + 1).bit_length() + 1, 8)
 
         self.transitionVariables: [TransitionVariablesBV] = list()
 
@@ -85,7 +111,7 @@ class PDDL2SMTBV:
 
         for index in range(0, bound + 1):
             var = TransitionVariablesBV(self.domain.predicates, self.domain.functions, self.domain.assList, self.pattern,
-                                      index, hasEffectAxioms, width=width)
+                                      index, hasEffectAxioms, width=self.width, action_width=self.action_width)
             self.transitionVariables.append(var)
 
         self.initial: [SMTExpression] = self.getInitialExpression()
@@ -98,6 +124,17 @@ class PDDL2SMTBV:
         # self.rules = self.initial + self.transitions + [self.goal]
         self.rules = self.initial + self.transitions + [self.goal]
         pass
+
+    def _ext(self, a_n: SMTExpression) -> SMTExpression:
+        """Zero-extend an action_width BV to value_width for arithmetic with state vars."""
+        if self.action_width == self.width:
+            return a_n
+        ext_expr = BVZExt(a_n.expression, self.width - self.action_width)
+        result = SMTExpression()
+        result.expression = ext_expr
+        result.variables = a_n.variables if hasattr(a_n, 'variables') else set()
+        result.type = BVType(self.width)
+        return result
 
     def getInitialExpression(self) -> List[SMTExpression]:
         tVars = self.transitionVariables[0]
@@ -199,15 +236,15 @@ class PDDL2SMTBV:
 
                 if v in prevAction.getAddList():
                     if self.hasEffectAxioms:
-                        rules.append(stepVars.deltaVariables[action][v] == d_bv.OR(b_n > to_bv(0, self.width)))
+                        rules.append(stepVars.deltaVariables[action][v] == d_bv.OR(b_n > to_bv(0, self.action_width)))
                     else:
-                        stepVars.deltaVariables[action][v] = d_bv.OR(b_n > to_bv(0, self.width))
+                        stepVars.deltaVariables[action][v] = d_bv.OR(b_n > to_bv(0, self.action_width))
 
                 if v in prevAction.getDelList():
                     if self.hasEffectAxioms:
-                        rules.append(stepVars.deltaVariables[action][v] == d_bv.AND(b_n == to_bv(0, self.width)))
+                        rules.append(stepVars.deltaVariables[action][v] == d_bv.AND(b_n == to_bv(0, self.action_width)))
                     else:
-                        stepVars.deltaVariables[action][v] = d_bv.AND(b_n == to_bv(0, self.width))
+                        stepVars.deltaVariables[action][v] = d_bv.AND(b_n == to_bv(0, self.action_width))
                 
             # Case c) Numeric increases or decreases
             if not prevAction.hasNonSimpleLinearIncrement(self.encoding):
@@ -217,7 +254,7 @@ class PDDL2SMTBV:
 
                         d_bv = stepVars.deltaVariables[prevAction][v]
                         k = SMTNumericVariable.fromPddl(funct, stepVars.deltaVariables[prevAction], bv=True, width=self.width, scale_factor=self.scale_factor)
-                        b_n = stepVars.actionVariables[prevAction]
+                        b_n = self._ext(stepVars.actionVariables[prevAction])
                         if sign > 0:
                             if self.hasEffectAxioms:
                                 rules.append(stepVars.deltaVariables[action][v] == d_bv + (k * b_n))
@@ -256,12 +293,12 @@ class PDDL2SMTBV:
             if a.isFake:
                 continue
             a_n = stepVars.actionVariables[a]
-            rules.append(a_n >= to_bv(0, self.width))
+            rules.append(a_n >= to_bv(0, self.action_width))
             if not a.couldBeRepeated() or (a.hasNonSimpleLinearIncrement(self.encoding)):
-                rules.append(a_n <= to_bv(1, self.width))
+                rules.append(a_n <= to_bv(1, self.action_width))
             else:
                 maxReps = self.rollBound if self.rollBound else self.max_actions
-                rules.append(a_n <= to_bv(maxReps, self.width))
+                rules.append(a_n <= to_bv(maxReps, self.action_width))
 
         if len(self.domain.arpg.stateLevels) > 2:
             for (atom, interval) in self.domain.arpg.stateLevels[-1].intervals.items():
@@ -281,8 +318,8 @@ class PDDL2SMTBV:
             if a.isFake:
                 continue
             # a_n > 0
-            lhs0 = stepVars.actionVariables[a] > to_bv(0, self.width)
-            lhs1 = stepVars.actionVariables[a] > to_bv(1, self.width)
+            lhs0 = stepVars.actionVariables[a] > to_bv(0, self.action_width)
+            lhs1 = stepVars.actionVariables[a] > to_bv(1, self.action_width)
             preconditions0 = None
             preconditions1 = None
             for pre in a.preconditions:
@@ -309,11 +346,11 @@ class PDDL2SMTBV:
                     if eff.operator == "increase":
                         subs[v] = stepVars.deltaVariables[a][v] + \
                                   SMTNumericVariable.fromPddl(eff.rhs, stepVars.deltaVariables[a], bv=True, width=self.width, scale_factor=self.scale_factor) * \
-                                  (stepVars.actionVariables[a] - to_bv(1, self.width))
+                                  (self._ext(stepVars.actionVariables[a]) - to_bv(1, self.width))
                     else:
                         subs[v] = stepVars.deltaVariables[a][v] - \
                                   SMTNumericVariable.fromPddl(eff.rhs, stepVars.deltaVariables[a], bv=True, width=self.width, scale_factor=self.scale_factor) * \
-                                  (stepVars.actionVariables[a] - to_bv(1, self.width))
+                                  (self._ext(stepVars.actionVariables[a]) - to_bv(1, self.width))
 
                 for v in stepVars.deltaVariables[a].keys():
                     subs[v] = subs[v] if v in subs else stepVars.deltaVariables[a][v]
@@ -342,8 +379,8 @@ class PDDL2SMTBV:
                 vl = float(str(rhs.value))
                 v2 = round(vl * self.scale_factor)
                 k = to_bv(v2, self.width)
-                rules.append((a_n > to_bv(0, self.width)).implies(v_a == k))
-                rules.append((a_n == to_bv(0, self.width)).implies(v_a == d_a_v))
+                rules.append((a_n > to_bv(0, self.action_width)).implies(v_a == k))
+                rules.append((a_n == to_bv(0, self.action_width)).implies(v_a == d_a_v))
 
             if not a.hasNonSimpleLinearIncrement(self.encoding):
                 continue
@@ -357,10 +394,10 @@ class PDDL2SMTBV:
                 d_a_v = stepVars.deltaVariables[a][var]
                 d_a_phi = SMTNumericVariable.fromPddl(eff.rhs, stepVars.deltaVariables[a], bv=True, width=self.width, scale_factor=self.scale_factor)
                 if eff.operator == "increase":
-                    rules.append((a_n > to_bv(0, self.width)).implies(v_a == d_a_v + d_a_phi))
+                    rules.append((a_n > to_bv(0, self.action_width)).implies(v_a == d_a_v + d_a_phi))
                 else:
-                    rules.append((a_n > to_bv(0, self.width)).implies(v_a == d_a_v - d_a_phi))
-                rules.append((a_n == to_bv(0, self.width)).implies(v_a == d_a_v))
+                    rules.append((a_n > to_bv(0, self.action_width)).implies(v_a == d_a_v - d_a_phi))
+                rules.append((a_n == to_bv(0, self.action_width)).implies(v_a == d_a_v))
 
         return rules
 
@@ -420,7 +457,7 @@ class PDDL2SMTBV:
 
                 # drive truck0 depot0 market5_1_n
                 val = solution.getVariable(stepVar.actionVariables[a])
-                if val is None or val >= 2**(self.width - 1):
+                if val is None or val >= 2**(self.action_width - 1):
                     repetitions = 0
                 else:
                     repetitions = int(val) * a.linearizationTimes
