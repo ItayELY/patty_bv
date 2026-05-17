@@ -47,6 +47,9 @@ LATEX_OP = {
 }
 
 
+EPSILON = 1e-6
+
+
 class Utilities:
 
     @staticmethod
@@ -66,6 +69,18 @@ class Utilities:
 
     @staticmethod
     def compare(op: str, left, right):
+        if op == "=":
+            return abs(left - right) < EPSILON
+        if op == "!=":
+            return abs(left - right) >= EPSILON
+        if op == ">=":
+            return left >= right - EPSILON
+        if op == ">":
+            return left > right - EPSILON
+        if op == "<=":
+            return left <= right + EPSILON
+        if op == "<":
+            return left < right + EPSILON
         return COMPARATORS[op](left, right)
 
     @classmethod

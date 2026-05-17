@@ -1,5 +1,6 @@
 import argparse
 import multiprocessing
+import os
 import sys
 import traceback
 from typing import Dict
@@ -23,8 +24,9 @@ def run_worker(worker_index: int, total_workers: int):
     envs = Envs()
     envs.isInsideAWS = False
 
-    log_suffix = f"_{worker_index}" if worker_index > 0 else ""
-    log_file = open(f"{envs.experiment}{log_suffix}.log", "a", encoding="utf-8")
+    log_dir = envs.experiment
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = open(os.path.join(log_dir, f"{worker_index}.log"), "a", encoding="utf-8")
 
     with open(envs.file, "r") as f:
         csv = f.read().strip()
