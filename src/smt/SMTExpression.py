@@ -3,9 +3,10 @@ from typing import Set, Dict
 
 from pysmt.fnode import FNode
 from pysmt.shortcuts import (
-    And, Or, Equals, LE, LT, GE, GT, Implies, Real, Times, Minus, Plus, Div, 
+    And, Or, Equals, LE, LT, GE, GT, Implies, Real, Times, Minus, Plus, Div,
     TRUE, ToReal, Int, NotEquals, Iff, BV, Not,
-    BVAdd, BVSub, BVMul, BVULT, BVULE, BVUGT, BVUGE, BVUGT, Ite, BVSGE, BVSLE, BVSGT, BVSLT
+    BVAdd, BVSub, BVMul, BVULT, BVULE, BVUGT, BVUGE, BVUGT, Ite, BVSGE, BVSLE, BVSGT, BVSLT,
+    BVUDiv
 )
 from pysmt.typing import REAL, INT, BOOL, BVType
 
@@ -158,15 +159,9 @@ class SMTExpression:
     # If multiplying by a constant 0, return constant 0
                 elif rhsExpression.is_constant() and rhsExpression.constant_value() == 0:
                     expr.expression = to_bv(0, target_bv_type.width)
-    # OPTIMIZATION: Use If-Then-Else instead of a full Multiplier circuit
-                elif rhsExpression.is_constant():
-                    k = rhsExpression.constant_value()
-                    # If action > 0 then K else 0 (Works if _n is binary 0/1)
-                    expr.expression = Ite(BVSGT(lhsExpression, to_bv(0, target_bv_type.width)),
-                                  to_bv(k, target_bv_type.width),
-                                  to_bv(0, target_bv_type.width))
                 else:
-                    expr.expression = BVMul(lhsExpression, rhsExpression)
+                    rhs_bv = to_bv(rhsExpression.constant_value(), target_bv_type.width) if rhsExpression.is_constant() else rhsExpression
+                    expr.expression = BVMul(lhsExpression, rhs_bv)
                 
                 return expr
             if actual_op == BVSub:
@@ -339,6 +334,16 @@ class SMTExpression:
             lhs = SMTExpression.fromPddl(predicate.lhs, variables, bv=bv, width=width, scale_factor=scale_factor)
             rhs = SMTExpression.fromPddl(predicate.rhs, variables, bv=bv, width=width, scale_factor=scale_factor)
             result = SMTExpression.opByString(predicate.operator, lhs, rhs)
+            # In BV mode, both operands are already scaled by scale_factor, so
+            # their product is scale_factor^2 times the real value. Divide by
+            # scale_factor to correct back to a single-scaled BV value.
+            if bv and predicate.operator == "*" and scale_factor > 1:
+                raw = result.expression if hasattr(result, 'expression') else result
+                div_expr = SMTExpression()
+                div_expr.variables = getattr(result, 'variables', set())
+                div_expr.type = getattr(result, 'type', BVType(width))
+                div_expr.expression = BVUDiv(raw, BV(scale_factor, width))
+                return div_expr
             return result
         if isinstance(predicate, Literal):
             return variables[predicate.getAtom()]
@@ -348,7 +353,6 @@ class SMTExpression:
             int_val = round(float(predicate.value) * scale_factor)
             # wrapper:
             expr = SMTExpression()
-            from pysmt.shortcuts import BV
             expr.expression = to_bv(int_val, width)
             expr.type = BVType(width)
             expr.variables = set()

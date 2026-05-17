@@ -355,7 +355,7 @@ class PDDL2SMTBV:
                 v_a = stepVars.auxVariables[a][var]
                 a_n = stepVars.actionVariables[a]
                 d_a_v = stepVars.deltaVariables[a][var]
-                d_a_phi = SMTNumericVariable.fromPddl(eff.rhs, stepVars.deltaVariables[a])
+                d_a_phi = SMTNumericVariable.fromPddl(eff.rhs, stepVars.deltaVariables[a], bv=True, width=self.width, scale_factor=self.scale_factor)
                 if eff.operator == "increase":
                     rules.append((a_n > to_bv(0, self.width)).implies(v_a == d_a_v + d_a_phi))
                 else:
