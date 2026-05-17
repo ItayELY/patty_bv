@@ -1,14 +1,14 @@
 import os
 import re
+import sys
 
 from classes.Planner import Planner
 from classes.Result import Result
 
 NAME = "PATTY"
 
-def _patty_exe():
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    return os.path.join(project_root, "patty")
+def _project_root():
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 class Patty(Planner):
@@ -41,7 +41,8 @@ class Patty(Planner):
         return r
 
     def getCommand(self, domain: str, problem: str):
-        cmd = [_patty_exe(), "-o", domain, "-f", problem, "-pp", "--pattern", self.pattern, "--solver", self.solver,
+        main = os.path.join(_project_root(), "main.py")
+        cmd = [sys.executable, main, "-o", domain, "-f", problem, "-pp", "--pattern", self.pattern, "--solver", self.solver,
                "--encoding", self.encoding, "--roll-bound", str(self.rollBound)]
         if self.hasEffectAxioms:
             cmd += ["--effect-axioms"]
