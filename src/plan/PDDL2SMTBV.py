@@ -63,7 +63,7 @@ class PDDL2SMTBV:
     domain: GroundedDomain
     problem: Problem
 
-    def __init__(self, domain: GroundedDomain, problem: Problem, pattern: Pattern, bound: int, encoding="non-linear", width = 20, max_actions = 50,
+    def __init__(self, domain: GroundedDomain, problem: Problem, pattern: Pattern, bound: int, encoding="non-linear", width = 25, max_actions = 50,
                  binaryActions=10, rollBound=0, hasEffectAxioms=False):
         self.domain = domain
         self.problem = problem
