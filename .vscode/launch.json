@@ -11,18 +11,19 @@
             "console": "integratedTerminal",
             "args": [
                 "-o",
-                "files/ipc-2023/sailing/domain.pddl",
+                "files/ipc-2023/fo-farmland/domain.pddl",
                 "-f",
-                "files/ipc-2023/sailing/instances/instance_1_4_1229.pddl",
+                "files/ipc-2023/fo-farmland/instances/instance_2_200_1229.pddl",
                 "--pattern",
                 "arpg",
                 "--save-smt", "file_smt",
                 "-pp",
                 "-v",
                 "4",
-                "--solver", "bitwuzla",
+                "--solver", "cvc5",
 
             ]
         }
     ]
 }
+

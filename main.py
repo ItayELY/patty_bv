@@ -1,4 +1,5 @@
 import random
+import sys
 import traceback
 from typing import List
 
@@ -118,9 +119,9 @@ def main():
         ts.end("Overall")
         console.log(str(ts), LogPrintLevel.TIMES)
 
-    except:
-        print("Something went wrong.")
+    except Exception:
         traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == '__main__':

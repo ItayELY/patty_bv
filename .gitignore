@@ -32,4 +32,5 @@ venv/
 *.log
 *.ipynb
 *.csv
+!benchmarks/instances*.csv
 bitwuzla/

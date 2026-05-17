@@ -7,8 +7,9 @@ from src.smt.SMTBoolVariable import SMTBoolVariable
 
 
 class TransitionVariablesBV(TransitionVariables):
-    def __init__(self, predicates, functions, assList, pattern, index, hasPlaceholders, width=10):
+    def __init__(self, predicates, functions, assList, pattern, index, hasPlaceholders, width=10, action_width=None):
         self.width = width
+        self.action_width = action_width if action_width is not None else width
         # We do NOT call super().__init__ because it would trigger the mangled parent methods
         
         self.functions = functions
@@ -50,8 +51,7 @@ class TransitionVariablesBV(TransitionVariables):
         variables = dict()
         for action in self.pattern:
             if not action.isFake:
-            # Pass self.width here
-                variables[action] = SMTBVVariable(f"{action.name}_{index}_n", self.width)
+                variables[action] = SMTBVVariable(f"{action.name}_{index}_n", self.action_width)
         return variables
 
     def __computeAuxVariables(self, index) -> Dict[Action, Dict[Atom, SMTBVVariable]]:

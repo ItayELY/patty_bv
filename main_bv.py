@@ -130,11 +130,10 @@ def main():
                         fn = args.savePlan if args.savePlan != "PROBLEM" else args.problem + ".plan"
                         with open(fn, "w") as f:
                             f.write(wholePlan.toValString())
+                    console.log(f"Bound: {bound}", LogPrintLevel.STATS)
+                    break
                 else:
                     console.log("Plan is NOT valid", LogPrintLevel.PLAN)
-                console.log(f"Bound: {bound}", LogPrintLevel.STATS)
-
-                break
 
             bound += 1
 
