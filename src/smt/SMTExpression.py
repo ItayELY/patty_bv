@@ -1,4 +1,5 @@
 from __future__ import annotations
+from fractions import Fraction
 from typing import Set, Dict
 
 from pysmt.fnode import FNode
@@ -6,7 +7,7 @@ from pysmt.shortcuts import (
     And, Or, Equals, LE, LT, GE, GT, Implies, Real, Times, Minus, Plus, Div,
     TRUE, ToReal, Int, NotEquals, Iff, BV, Not,
     BVAdd, BVSub, BVMul, BVULT, BVULE, BVUGT, BVUGE, BVUGT, Ite, BVSGE, BVSLE, BVSGT, BVSLT,
-    BVLShl
+    BVLShl, BVUDiv
 )
 from pysmt.typing import REAL, INT, BOOL, BVType
 
@@ -323,18 +324,41 @@ class SMTExpression:
     def fromPddl(cls, predicate: BinaryPredicate or Literal or Constant,
                  variables: Dict[Atom, SMTExpression], bv=False, width = 0, scale_factor=1) -> SMTExpression or float:
         if isinstance(predicate, BinaryPredicate):
+            if bv and predicate.operator == "*" and scale_factor > 1:
+                lhs_is_const = isinstance(predicate.lhs, Constant)
+                rhs_is_const = isinstance(predicate.rhs, Constant)
+                if lhs_is_const != rhs_is_const:
+                    # One side is a pure constant, other is a variable expression.
+                    # Variables are already scaled by scale_factor; multiplying a
+                    # scale_factor-scaled constant by a scaled variable would give
+                    # scale^2 instead of scale.  Apply the constant as a rational
+                    # multiplier: numerator*var / denominator (BV integer division).
+                    const_pred = predicate.lhs if lhs_is_const else predicate.rhs
+                    var_pred   = predicate.rhs if lhs_is_const else predicate.lhs
+                    c = Fraction(str(float(const_pred.value))).limit_denominator(10000)
+                    var_expr = SMTExpression.fromPddl(var_pred, variables, bv=bv, width=width, scale_factor=scale_factor)
+                    # _bv_const_mul requires a non-negative multiplier; handle sign separately
+                    abs_numer = abs(c.numerator)
+                    scaled = _bv_const_mul(var_expr.expression, abs_numer, width)
+                    if c.denominator > 1:
+                        scaled = BVUDiv(scaled, to_bv(c.denominator, width))
+                    if c.numerator < 0:
+                        from pysmt.shortcuts import BVSub
+                        scaled = BVSub(to_bv(0, width), scaled)
+                    result = SMTExpression()
+                    result.variables = var_expr.variables
+                    result.type = BVType(width)
+                    result.expression = scaled
+                    return result
             lhs = SMTExpression.fromPddl(predicate.lhs, variables, bv=bv, width=width, scale_factor=scale_factor)
             rhs = SMTExpression.fromPddl(predicate.rhs, variables, bv=bv, width=width, scale_factor=scale_factor)
-            result = SMTExpression.opByString(predicate.operator, lhs, rhs)
-            # In BV mode, both operands are already scaled by scale_factor, so
-            return result
+            return SMTExpression.opByString(predicate.operator, lhs, rhs)
         if isinstance(predicate, Literal):
             return variables[predicate.getAtom()]
         if isinstance(predicate, Constant):
             if not bv:
                 return predicate.value
             int_val = round(float(predicate.value) * scale_factor)
-            # wrapper:
             expr = SMTExpression()
             expr.expression = to_bv(int_val, width)
             expr.type = BVType(width)

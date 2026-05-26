@@ -400,7 +400,10 @@ class PDDL2SMTBV:
                 a_n = stepVars.actionVariables[a]
                 d_a_v = stepVars.deltaVariables[a][var]
                 if not isinstance(rhs, Constant):
-                    raise Exception("I cannot handle yet linear assignments")
+                    rhs_expr = SMTExpression.fromPddl(rhs, stepVars.deltaVariables[a], bv=True, width=self.width, scale_factor=self.effect_scale)
+                    rules.append((a_n > to_bv(0, self.action_width)).implies(v_a == rhs_expr))
+                    rules.append((a_n == to_bv(0, self.action_width)).implies(v_a == d_a_v))
+                    continue
                 vl = float(str(rhs.value))
                 v2 = round(vl * self.effect_scale)
                 k = to_bv(v2, self.width)
