@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(timeout 60 python3 main_bv.py -o files/IPC2026/2048/domain.pddl -f files/IPC2026/2048/pfile1.pddl --solver bitwuzla --pattern arpg -n 5 -v 3)",
+      "Bash(timeout 90 python3 main_bv.py -o files/IPC2026/sailing-wind/domain.pddl -f files/IPC2026/sailing-wind/problem_0.pddl --solver bitwuzla --pattern arpg -n 5 -v 4)"
+    ]
+  }
+}

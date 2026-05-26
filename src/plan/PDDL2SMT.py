@@ -290,7 +290,10 @@ class PDDL2SMT:
                 a_n = stepVars.actionVariables[a]
                 d_a_v = stepVars.deltaVariables[a][var]
                 if not isinstance(rhs, Constant):
-                    raise Exception("I cannot handle yet linear assignments")
+                    rhs_expr = SMTExpression.fromPddl(rhs, stepVars.deltaVariables[a])
+                    rules.append((a_n > 0).implies(v_a == rhs_expr))
+                    rules.append((a_n == 0).implies(v_a == d_a_v))
+                    continue
                 k = rhs.value
                 rules.append((a_n > 0).implies(v_a == k))
                 rules.append((a_n == 0).implies(v_a == d_a_v))

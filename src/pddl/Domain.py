@@ -1,7 +1,9 @@
 from __future__ import annotations
+import re
 from typing import Dict, List, Set
 
 from src.pddl.Atom import Atom
+from src.pddl.Literal import Literal
 from src.pddl.Operation import Operation
 from src.pddl.Problem import Problem
 from src.pddl.Utilities import Utilities
@@ -33,14 +35,33 @@ class Domain:
         self.processes = set()
         self.events = set()
         self.requirements = list()
-        self.constants = set()
+        self.constants: Dict[str, List[str]] = dict()
         pass
 
     def ground(self, problem: Problem, avoidSimplification=False) -> GroundedDomain:
 
-        gActions: Set[Action] = set([g for action in self.actions for g in action.ground(problem)])
-        gEvents: Set[Event] = set([g for event in self.events for g in event.ground(problem)])
-        gProcess: Set[Process] = set([g for process in self.processes for g in process.ground(problem)])
+        for typeName, objects in self.constants.items():
+            problem.objectsByType.setdefault(typeName, [])
+            for obj in objects:
+                if obj not in problem.objectsByType[typeName]:
+                    problem.objectsByType[typeName].append(obj)
+
+        # Build static-predicate filter: skip combinations where a never-modified
+        # positive precondition is false in the initial state (handles domains like
+        # 2048 where pos-at/next facts constrain the huge constant parameter space).
+        dynamicPredicateNames: Set[str] = set()
+        for op in self.actions | self.events | self.processes:
+            for atom in op.getAddList() | op.getDelList():
+                dynamicPredicateNames.add(atom.name)
+
+        initPredicates: Set[Atom] = set()
+        for assignment in problem.init:
+            if isinstance(assignment, Literal) and assignment.sign == "+":
+                initPredicates.add(assignment.getAtom())
+
+        gActions: Set[Action] = set([g for action in self.actions for g in action.ground(problem, initPredicates, dynamicPredicateNames)])
+        gEvents: Set[Event] = set([g for event in self.events for g in event.ground(problem, initPredicates, dynamicPredicateNames)])
+        gProcess: Set[Process] = set([g for process in self.processes for g in process.ground(problem, initPredicates, dynamicPredicateNames)])
 
         gDomain = GroundedDomain(self.name, gActions, gEvents, gProcess)
 
@@ -106,6 +127,48 @@ class Domain:
 
         return domain
 
+    @staticmethod
+    def _extractConstantsBlock(domainString: str):
+        """Remove (:constants ...) from domain string and return (inner_text, remaining)."""
+        match = re.search(r'\(\s*:constants', domainString)
+        if not match:
+            return None, domainString
+        start = match.start()
+        depth = 0
+        for i in range(start, len(domainString)):
+            if domainString[i] == '(':
+                depth += 1
+            elif domainString[i] == ')':
+                depth -= 1
+                if depth == 0:
+                    inner = domainString[match.end():i].strip()
+                    remaining = domainString[:start] + domainString[i + 1:]
+                    return inner, remaining
+        return None, domainString
+
+    @staticmethod
+    def _parseTypedList(text: str) -> Dict[str, List[str]]:
+        """Parse 'obj1 obj2 - type ...' text into Dict[type, List[obj]]."""
+        fake = f"(define (problem p) (:domain d) (:objects {text}))"
+        parseTree = Utilities.getParseTree(fake)
+        result: Dict[str, List[str]] = {}
+        for node in parseTree.problem().getChildren():
+            if not isinstance(node, pddlParser.ObjectsContext):
+                continue
+            for typeNode in node.children:
+                if not isinstance(typeNode, pddlParser.TypedObjectsContext):
+                    continue
+                typeStr = ""
+                objects = []
+                for child in typeNode.children:
+                    if isinstance(child, pddlParser.GroundAtomParameterContext):
+                        objects.append(child.getText())
+                    elif isinstance(child, pddlParser.TypeNameContext):
+                        typeStr = child.getText()
+                result.setdefault(typeStr, [])
+                result[typeStr].extend(objects)
+        return result
+
     @classmethod
     def fromFile(cls, filename) -> Domain:
         f = open(filename, 'r')
@@ -113,8 +176,18 @@ class Domain:
         f.close()
         domainString = Utilities.removeComments(domainString)
 
+        constants_text, domainString = cls._extractConstantsBlock(domainString)
+
+        # :action-costs is lexed as :action (keyword) + - + costs, which breaks the parser
+        domainString = re.sub(r':action-costs\b', ':fluents', domainString)
+
         parseTree: pddlParser = Utilities.getParseTree(domainString)
-        return cls.fromNode(parseTree.domain())
+        domain = cls.fromNode(parseTree.domain())
+
+        if constants_text:
+            domain.constants = cls._parseTypedList(constants_text)
+
+        return domain
 
     def __setDomainName(self, node: pddlParser.DomainNameContext):
         self.name = node.getChild(2).getText()

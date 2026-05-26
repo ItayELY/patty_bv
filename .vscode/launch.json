@@ -11,19 +11,18 @@
             "console": "integratedTerminal",
             "args": [
                 "-o",
-                "files/ipc-2023/fo-farmland/domain.pddl",
+                "files/IPC2026/rainbowttle/domain.pddl",
                 "-f",
-                "files/ipc-2023/fo-farmland/instances/instance_2_200_1229.pddl",
+                "files/IPC2026/rainbowttle/p11.pddl",
                 "--pattern",
                 "arpg",
                 "--save-smt", "file_smt",
                 "-pp",
                 "-v",
                 "4",
-                "--solver", "cvc5",
+                "--solver", "bitwuzla",
 
             ]
         }
     ]
 }
-
