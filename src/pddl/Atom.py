@@ -57,7 +57,7 @@ class Atom:
     def ground(self, subs: Dict[str, str]) -> Atom:
         atom = Atom()
         atom.name = self.name
-        atom.attributes = [subs[attr] for attr in self.attributes]
+        atom.attributes = [subs.get(attr, attr) for attr in self.attributes]
         atom.__setProperties()
         return atom
 

@@ -6,7 +6,7 @@ from pysmt.shortcuts import (
     And, Or, Equals, LE, LT, GE, GT, Implies, Real, Times, Minus, Plus, Div,
     TRUE, ToReal, Int, NotEquals, Iff, BV, Not,
     BVAdd, BVSub, BVMul, BVULT, BVULE, BVUGT, BVUGE, BVUGT, Ite, BVSGE, BVSLE, BVSGT, BVSLT,
-    BVUDiv
+    BVLShl
 )
 from pysmt.typing import REAL, INT, BOOL, BVType
 
@@ -18,6 +18,25 @@ def to_bv(value, width):
     if value < 0:
         value = (1 << width) + value
     return BV(value, width)
+
+
+def _bv_const_mul(x_fnode, k, width):
+    """Multiply BV FNode x by integer constant k using shifts+adds — no BVMul."""
+    k = int(k)
+    if k == 0:
+        return BV(0, width)
+    if k == 1:
+        return x_fnode
+    result = None
+    shift = 0
+    remaining = k
+    while remaining:
+        if remaining & 1:
+            term = BVLShl(x_fnode, BV(shift, width)) if shift > 0 else x_fnode
+            result = BVAdd(result, term) if result is not None else term
+        remaining >>= 1
+        shift += 1
+    return result
 
 def toRHS(other, target_type=None):
     """
@@ -106,103 +125,76 @@ class SMTExpression:
 
     def __binary(self, other: SMTExpression or float, operation, lhsExpression: FNode,
                  rhsExpression: FNode) -> SMTExpression:
-                 
-        # 1. Ensure we are working with raw expressions
+        # Unwrap SMTExpression wrappers to raw FNodes
         lhs_raw = lhsExpression.expression if hasattr(lhsExpression, 'expression') else lhsExpression
         rhs_raw = rhsExpression.expression if hasattr(rhsExpression, 'expression') else rhsExpression
 
-# 2. Use the environment's Static Type Checker (STC)
         from pysmt.environment import get_env
         stc = get_env().stc
         l_type = stc.get_type(lhs_raw)
         try:
             r_type = stc.get_type(rhs_raw)
-        except:
-            pass
-        # 1. BIT-VECTOR PATH (Priority)
-        vars_lhs = getVars(self)
-        vars_rhs = getVars(other)
-        combined_vars = vars_lhs | vars_rhs
+        except Exception:
+            r_type = l_type
+
+        combined_vars = getVars(self) | getVars(other)
         is_bv = (l_type and l_type.is_bv_type()) or (r_type and r_type.is_bv_type())
-        
+
         if is_bv:
-            if l_type != r_type:
-                try:
-                    target_width = rhsExpression.bv_width()
-                    lhsExpression = to_bv(int(float(str(lhsExpression))), target_width)
-                except:
-                    target_width = lhsExpression.bv_width()
-                    rhsExpression = to_bv(int(float(str(rhsExpression))), target_width)
             target_bv_type = l_type if (l_type and l_type.is_bv_type()) else r_type
-            expr = SMTExpression()
-            expr.variables = combined_vars
-            expr.type = target_bv_type
-                
-            # Map Arithmetic/Comparison to BV Equivalents
+            width = target_bv_type.width
+
+            # Coerce mismatched widths: convert the non-BV side to a BV constant
+            if l_type != r_type:
+                if not (l_type and l_type.is_bv_type()):
+                    lhs_raw = to_bv(int(float(lhs_raw.constant_value())), width)
+                else:
+                    rhs_raw = to_bv(int(float(rhs_raw.constant_value())), width)
+
             bv_map = {
                 Plus: BVAdd, Minus: BVSub, Times: BVMul,
                 LT: BVSLT, LE: BVSLE, GT: BVSGT, GE: BVSGE,
                 Equals: Equals, NotEquals: lambda l, r: Not(Equals(l, r))
             }
-            
             actual_op = bv_map.get(operation, operation)
-            
-            # PERFORMANCE OPTIMIZATION:
-            # Multiplications in BV are slow. If we are multiplying a variable by a constant,
-            # use an Ite (If-Then-Else) logic for binary action counts.
-            # Inside your __binary method for the is_bv path:
+
+            expr = SMTExpression()
+            expr.variables = combined_vars
+            expr.type = target_bv_type
 
             if actual_op == BVMul:
-    # If multiplying by a constant 1, just return the variable
-                if rhsExpression.is_constant() and rhsExpression.constant_value() == 1:
-                    expr.expression = lhsExpression
-    # If multiplying by a constant 0, return constant 0
-                elif rhsExpression.is_constant() and rhsExpression.constant_value() == 0:
-                    expr.expression = to_bv(0, target_bv_type.width)
+                # Use shift+add decomposition when one side is a constant — avoids
+                # nonlinear BVMul which is extremely slow to bit-blast.
+                if rhs_raw.is_bv_constant():
+                    expr.expression = _bv_const_mul(lhs_raw, rhs_raw.bv_unsigned_value(), width)
+                elif lhs_raw.is_bv_constant():
+                    expr.expression = _bv_const_mul(rhs_raw, lhs_raw.bv_unsigned_value(), width)
                 else:
-                    rhs_bv = to_bv(rhsExpression.constant_value(), target_bv_type.width) if rhsExpression.is_constant() else rhsExpression
-                    expr.expression = BVMul(lhsExpression, rhs_bv)
-                
+                    expr.expression = BVMul(lhs_raw, rhs_raw)
                 return expr
+
             if actual_op == BVSub:
-                width = target_bv_type.width
-    
-    # 1. Standard Case: Variable - Constant (e.g., fuel - 1)
-                if rhsExpression.is_constant():
-                    k = rhsExpression.constant_value()
-        # If subtracting 0, just return the variable
-                    if k == 0:
-                        expr.expression = lhsExpression
-                    else:
-                        expr.expression = BVSub(lhsExpression, to_bv(k, width))
-
-    # 2. Reverse Case: Constant - Variable (e.g., 20 - bought)
-                elif lhsExpression.is_constant():
-                    k = lhsExpression.constant_value()
-        # Optimization: We cannot use a simple ITE here like in BVMul 
-        # because the variable being subtracted isn't necessarily binary.
-        # We just ensure the constant k is correctly cast to a Bit-Vector.
-                    expr.expression = BVSub(to_bv(k, width), rhsExpression)
-        
-    # 3. Variable - Variable Case
+                rhs_const = rhs_raw.is_bv_constant()
+                lhs_const = lhs_raw.is_bv_constant()
+                if rhs_const and rhs_raw.bv_unsigned_value() == 0:
+                    expr.expression = lhs_raw
                 else:
-                    expr.expression = BVSub(lhsExpression, rhsExpression)
-
+                    expr.expression = BVSub(lhs_raw, rhs_raw)
                 return expr
 
-        # 2. INTEGER/REAL FALLBACK (Only runs if not BV)
+            expr.expression = actual_op(lhs_raw, rhs_raw)
+            return expr
+
+        # INTEGER/REAL FALLBACK
         if l_type == REAL and r_type == INT:
-            rhsExpression = ToReal(rhsExpression)
+            rhs_raw = ToReal(rhs_raw)
         elif l_type == INT and r_type == REAL:
-            lhsExpression = ToReal(lhsExpression)
-            
+            lhs_raw = ToReal(lhs_raw)
+
         expr = SMTExpression()
-        expr.variables = getVars(self) | getVars(other)
+        expr.variables = combined_vars
         expr.type = l_type if l_type == r_type else REAL
-        try:
-            expr.expression = operation(lhsExpression, rhsExpression) if not is_bv else actual_op(lhsExpression, rhsExpression)
-        except: 
-            pass
+        expr.expression = operation(lhs_raw, rhs_raw)
         return expr
     # --- Logical Operators ---
     def AND(self, other: SMTExpression):
@@ -335,15 +327,6 @@ class SMTExpression:
             rhs = SMTExpression.fromPddl(predicate.rhs, variables, bv=bv, width=width, scale_factor=scale_factor)
             result = SMTExpression.opByString(predicate.operator, lhs, rhs)
             # In BV mode, both operands are already scaled by scale_factor, so
-            # their product is scale_factor^2 times the real value. Divide by
-            # scale_factor to correct back to a single-scaled BV value.
-            if bv and predicate.operator == "*" and scale_factor > 1:
-                raw = result.expression if hasattr(result, 'expression') else result
-                div_expr = SMTExpression()
-                div_expr.variables = getattr(result, 'variables', set())
-                div_expr.type = getattr(result, 'type', BVType(width))
-                div_expr.expression = BVUDiv(raw, BV(scale_factor, width))
-                return div_expr
             return result
         if isinstance(predicate, Literal):
             return variables[predicate.getAtom()]

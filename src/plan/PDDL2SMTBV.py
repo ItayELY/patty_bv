@@ -40,14 +40,7 @@ def _collect_consts(obj, out):
             _collect_consts(c, out)
 
 
-def _compute_scale_factor(domain, problem):
-    consts = []
-    for action in domain.actions:
-        _collect_consts(action.preconditions, consts)
-        for eff in action.effects:
-            _collect_consts(eff, consts)
-    for assignment in problem.init:
-        _collect_consts(assignment, consts)
+def _compute_scale_factor(consts):
     scale = 1
     for v in consts:
         d = Fraction(v).limit_denominator(1000).denominator
@@ -55,7 +48,8 @@ def _compute_scale_factor(domain, problem):
     return scale
 
 
-def _compute_min_width(domain, problem, scale_factor):
+def _effect_consts(domain, problem):
+    """Constants from action effects, preconditions, and init (not goal)."""
     consts = []
     for action in domain.actions:
         _collect_consts(action.preconditions, consts)
@@ -63,17 +57,33 @@ def _compute_min_width(domain, problem, scale_factor):
             _collect_consts(eff, consts)
     for assignment in problem.init:
         _collect_consts(assignment, consts)
-    _collect_consts(problem.goal, consts)
+    return consts
 
-    if not consts:
+
+def _compute_min_width(domain, problem, effect_scale, goal_scale):
+    """Compute BV width to hold state values and goal-scaled constants.
+
+    State variables are scaled by effect_scale.  Goal constants (coefficients
+    and RHS thresholds) are scaled by goal_scale.  The worst-case BV value is
+    the larger of the max goal-scaled constant and the max state value; one
+    extra bit is added for intermediate sums.
+    """
+    ec = _effect_consts(domain, problem)
+    gc = []
+    _collect_consts(problem.goal, gc)
+
+    if not ec and not gc:
         return 15
 
-    max_val = max(abs(Fraction(str(v)) * scale_factor) for v in consts)
+    max_state = max((abs(Fraction(str(v)) * effect_scale) for v in ec), default=Fraction(1))
+    max_goal = max((abs(Fraction(str(v)) * goal_scale) for v in gc), default=Fraction(1))
+
+    max_val = int(max(max_state, max_goal))
     if max_val < 1:
         return 15
 
-    # +1 for signed bit, +1 safety margin
-    bits = int(max_val).bit_length() + 2
+    # +1 for signed bit, +1 safety margin, +1 for intermediate sums in goal
+    bits = max_val.bit_length() + 3
     return max(bits, 10)
 
 
@@ -96,8 +106,16 @@ class PDDL2SMTBV:
         self.rollBound = rollBound
         self.hasEffectAxioms = hasEffectAxioms
         self.max_actions = max_actions
-        self.scale_factor = _compute_scale_factor(domain, problem)
-        self.width = width if width is not None else _compute_min_width(domain, problem, self.scale_factor)
+        ec = _effect_consts(domain, problem)
+        gc = []
+        _collect_consts(problem.goal, gc)
+        # effect_scale: clears denominators in action effects / preconditions / init
+        self.effect_scale = _compute_scale_factor(ec)
+        # goal_scale: clears denominators across everything including goal coefficients
+        self.goal_scale = _compute_scale_factor(ec + gc)
+        # Legacy alias used in a few internal paths
+        self.scale_factor = self.goal_scale
+        self.width = width if width is not None else _compute_min_width(domain, problem, self.effect_scale, self.goal_scale)
         # action counts are small (bounded by max_actions); use a narrow BV to keep solver fast
         self.action_width = max(int(max_actions + 1).bit_length() + 1, 8)
 
@@ -150,7 +168,7 @@ class PDDL2SMTBV:
                 if assignment.getAtom() not in self.domain.allAtoms:
                     # print(f"Atom {assignments.getAtom()} was pruned since it's a constant")
                     continue
-                rules.append(tVars.valueVariables[assignment.getAtom()] == to_bv(round(float(str(assignment.rhs)) * self.scale_factor), self.width))
+                rules.append(tVars.valueVariables[assignment.getAtom()] == to_bv(round(float(str(assignment.rhs)) * self.effect_scale), self.width))
 
             elif isinstance(assignment, Literal):
                 rules.append(tVars.valueVariables[assignment.getAtom()])
@@ -171,7 +189,7 @@ class PDDL2SMTBV:
                 # tp = (type(condition.rhs.value))
                 # if type(condition.rhs.value) in (int, float):
                     # condition.rhs = BV(int(condition.rhs.value), self.width)
-                expr = SMTExpression.fromPddl(condition, tVars.valueVariables, bv=True, width=self.width, scale_factor=self.scale_factor)
+                expr = SMTExpression.fromPddl(condition, tVars.valueVariables, bv=True, width=self.width, scale_factor=self.goal_scale)
                 rules.append(expr)
             elif isinstance(condition, Literal):
                 if condition.sign == "+":
@@ -253,7 +271,7 @@ class PDDL2SMTBV:
                     for v, funct in modificationDict.items():
 
                         d_bv = stepVars.deltaVariables[prevAction][v]
-                        k = SMTNumericVariable.fromPddl(funct, stepVars.deltaVariables[prevAction], bv=True, width=self.width, scale_factor=self.scale_factor)
+                        k = SMTNumericVariable.fromPddl(funct, stepVars.deltaVariables[prevAction], bv=True, width=self.width, scale_factor=self.effect_scale)
                         b_n = self._ext(stepVars.actionVariables[prevAction])
                         if sign > 0:
                             if self.hasEffectAxioms:
@@ -305,9 +323,9 @@ class PDDL2SMTBV:
                 if atom not in stepVars.valueVariables:
                     continue
                 if interval.lb != float("-inf"):
-                    rules.append(stepVars.valueVariables[atom] >= to_bv(round(interval.lb * self.scale_factor), self.width))
+                    rules.append(stepVars.valueVariables[atom] >= to_bv(round(interval.lb * self.effect_scale), self.width))
                 if interval.ub != float("+inf"):
-                    rules.append(stepVars.valueVariables[atom] <= to_bv(round(interval.ub * self.scale_factor), self.width))
+                    rules.append(stepVars.valueVariables[atom] <= to_bv(round(interval.ub * self.effect_scale), self.width))
 
         return rules
 
@@ -331,7 +349,7 @@ class PDDL2SMTBV:
                     preconditions1 = preconditions1.AND(rhs) if preconditions1 else rhs
                     continue
 
-                precondition0 = SMTNumericVariable.fromPddl(pre, stepVars.deltaVariables[a], bv=True, width=self.width, scale_factor=self.scale_factor)
+                precondition0 = SMTNumericVariable.fromPddl(pre, stepVars.deltaVariables[a], bv=True, width=self.width, scale_factor=self.effect_scale)
                 preconditions0 = preconditions0.AND(precondition0) if preconditions0 else precondition0
 
                 subs: Dict[Atom, SMTExpression] = dict()
@@ -345,18 +363,18 @@ class PDDL2SMTBV:
                         continue
                     if eff.operator == "increase":
                         subs[v] = stepVars.deltaVariables[a][v] + \
-                                  SMTNumericVariable.fromPddl(eff.rhs, stepVars.deltaVariables[a], bv=True, width=self.width, scale_factor=self.scale_factor) * \
+                                  SMTNumericVariable.fromPddl(eff.rhs, stepVars.deltaVariables[a], bv=True, width=self.width, scale_factor=self.effect_scale) * \
                                   (self._ext(stepVars.actionVariables[a]) - to_bv(1, self.width))
                     else:
                         subs[v] = stepVars.deltaVariables[a][v] - \
-                                  SMTNumericVariable.fromPddl(eff.rhs, stepVars.deltaVariables[a], bv=True, width=self.width, scale_factor=self.scale_factor) * \
+                                  SMTNumericVariable.fromPddl(eff.rhs, stepVars.deltaVariables[a], bv=True, width=self.width, scale_factor=self.effect_scale) * \
                                   (self._ext(stepVars.actionVariables[a]) - to_bv(1, self.width))
 
                 for v in stepVars.deltaVariables[a].keys():
                     subs[v] = subs[v] if v in subs else stepVars.deltaVariables[a][v]
 
                 # Transformed precondition
-                precondition1 = SMTNumericVariable.fromPddl(pre, subs, bv=True, width=self.width, scale_factor=self.scale_factor)
+                precondition1 = SMTNumericVariable.fromPddl(pre, subs, bv=True, width=self.width, scale_factor=self.effect_scale)
                 preconditions1 = preconditions1.AND(precondition1) if preconditions1 else precondition1
 
             if preconditions0:
@@ -377,7 +395,7 @@ class PDDL2SMTBV:
                 if not isinstance(rhs, Constant):
                     raise Exception("I cannot handle yet linear assignments")
                 vl = float(str(rhs.value))
-                v2 = round(vl * self.scale_factor)
+                v2 = round(vl * self.effect_scale)
                 k = to_bv(v2, self.width)
                 rules.append((a_n > to_bv(0, self.action_width)).implies(v_a == k))
                 rules.append((a_n == to_bv(0, self.action_width)).implies(v_a == d_a_v))
@@ -392,7 +410,7 @@ class PDDL2SMTBV:
                 v_a = stepVars.auxVariables[a][var]
                 a_n = stepVars.actionVariables[a]
                 d_a_v = stepVars.deltaVariables[a][var]
-                d_a_phi = SMTNumericVariable.fromPddl(eff.rhs, stepVars.deltaVariables[a], bv=True, width=self.width, scale_factor=self.scale_factor)
+                d_a_phi = SMTNumericVariable.fromPddl(eff.rhs, stepVars.deltaVariables[a], bv=True, width=self.width, scale_factor=self.effect_scale)
                 if eff.operator == "increase":
                     rules.append((a_n > to_bv(0, self.action_width)).implies(v_a == d_a_v + d_a_phi))
                 else:

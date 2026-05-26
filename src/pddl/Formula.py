@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 
 from itertools import chain
-from typing import Dict, Set
+from typing import Dict, List, Set, Tuple
 
 from src.pddl.Atom import Atom
 from src.pddl.BinaryPredicate import BinaryPredicate
@@ -13,19 +13,54 @@ from src.pddl.Utilities import Utilities
 from src.pddl.grammar.pddlParser import pddlParser as p
 
 
+def _isObjectVar(operationSideNode) -> str | None:
+    """Return the variable name if the node is a bare object variable (?x), else None."""
+    if operationSideNode is None or operationSideNode.getChildCount() == 0:
+        return None
+    child = operationSideNode.getChild(0)
+    if not isinstance(child, p.PositiveLiteralContext):
+        return None
+    # A bare ?x is parsed as PositiveLiteralContext with one LiftedAtomParameterContext child
+    if child.getChildCount() == 1 and isinstance(child.getChild(0), p.LiftedAtomParameterContext):
+        return child.getChild(0).getText()
+    return None
+
+
+def _extractObjectDisequality(clause) -> Tuple[str, str] | None:
+    """If clause is (not (= ?x ?y)) with object variables, return (?x, ?y). Else None."""
+    if not isinstance(clause, p.NegatedComparationContext):
+        return None
+    inner = clause.getChild(2)
+    if not isinstance(inner, p.ComparationContext):
+        return None
+    if inner.getChildCount() < 4:
+        return None
+    op = inner.getChild(1).getText() if inner.getChild(1) else None
+    if op != '=':
+        return None
+    lhs_var = _isObjectVar(inner.getChild(2))
+    rhs_var = _isObjectVar(inner.getChild(3))
+    if lhs_var is not None and rhs_var is not None:
+        return (lhs_var, rhs_var)
+    return None
+
+
 class Formula:
     type: str
     conditions: [Formula or Predicate]
+    disequalities: List[Tuple[str, str]]  # object inequality constraints: (?x, ?y) means x != y
 
     def __init__(self):
         self.type = "AND"
         self.conditions = list()
+        self.disequalities = list()
 
     def __deepcopy__(self, m=None) -> Formula:
         m = {} if m is None else m
         f = Formula()
         f.type = self.type
         f.conditions = copy.deepcopy(self.conditions, m)
+        f.disequalities = copy.deepcopy(self.disequalities, m)
         return f
 
     @classmethod
@@ -54,7 +89,11 @@ class Formula:
             elif isinstance(clause, p.BooleanLiteralContext):
                 formula.conditions.append(Literal.fromNode(clause.getChild(0)))
             elif type(clause) in {p.ComparationContext, p.NegatedComparationContext}:
-                formula.conditions.append(BinaryPredicate.fromNode(clause))
+                diseq = _extractObjectDisequality(clause)
+                if diseq is not None:
+                    formula.disequalities.append(diseq)
+                else:
+                    formula.conditions.append(BinaryPredicate.fromNode(clause))
 
         return formula
 
@@ -65,9 +104,17 @@ class Formula:
     def ground(self, subs: Dict[str, str]):
         gFormula = Formula()
         gFormula.type = self.type
+        gFormula.disequalities = self.disequalities
         for condition in self.conditions:
             gFormula.conditions.append(condition.ground(subs))
         return gFormula
+
+    def violatesDisequalities(self, subs: Dict[str, str]) -> bool:
+        """Return True if any (?x, ?y) disequality is violated (x and y map to the same object)."""
+        for (x, y) in self.disequalities:
+            if subs.get(x, x) == subs.get(y, y):
+                return True
+        return False
 
     def getFunctions(self) -> Set[Atom]:
         functions = set()
