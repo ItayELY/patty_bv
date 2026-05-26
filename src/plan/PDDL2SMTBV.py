@@ -337,8 +337,10 @@ class PDDL2SMTBV:
                 continue
             # a_n > 0
             lhs0 = stepVars.actionVariables[a] > to_bv(0, self.action_width)
-            lhs1 = stepVars.actionVariables[a] > to_bv(1, self.action_width)
             preconditions0 = None
+            # Non-repeatable actions are bounded to count ≤ 1, so count > 1 is always
+            # false; skip the BV-multiplication transformed-precondition entirely.
+            can_repeat = a.couldBeRepeated() and not a.hasNonSimpleLinearIncrement(self.encoding)
             preconditions1 = None
             for pre in a.preconditions:
                 if isinstance(pre, Literal):
@@ -346,11 +348,15 @@ class PDDL2SMTBV:
                     d_av = stepVars.deltaVariables[a][v]
                     rhs = d_av if pre.sign == "+" else d_av.NOT()
                     preconditions0 = preconditions0.AND(rhs) if preconditions0 else rhs
-                    preconditions1 = preconditions1.AND(rhs) if preconditions1 else rhs
+                    if can_repeat:
+                        preconditions1 = preconditions1.AND(rhs) if preconditions1 else rhs
                     continue
 
                 precondition0 = SMTNumericVariable.fromPddl(pre, stepVars.deltaVariables[a], bv=True, width=self.width, scale_factor=self.effect_scale)
                 preconditions0 = preconditions0.AND(precondition0) if preconditions0 else precondition0
+
+                if not can_repeat:
+                    continue
 
                 subs: Dict[Atom, SMTExpression] = dict()
                 # Searching for decrease effects
@@ -381,6 +387,7 @@ class PDDL2SMTBV:
                 rules.append(lhs0.implies(preconditions0))
 
             if preconditions1:
+                lhs1 = stepVars.actionVariables[a] > to_bv(1, self.action_width)
                 rules.append(lhs1.implies(preconditions1))
         return rules
 

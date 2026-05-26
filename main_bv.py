@@ -50,13 +50,11 @@ def main():
         bMax = args.bound if args.bound else 1000
 
         order: List[Operation]
-        # if args.pattern == "arpg":
-        order = list(gDomain.actions)
-        random.shuffle(order)        # elif args.pattern == "random":
-        
-        # else:
-            # raise Exception(f"Pattern generation method '{args.pattern}' unknown")
-        # pattern: Pattern = Pattern.fromOrder(order)
+        if args.pattern == "arpg":
+            order = gDomain.arpg.getActionsOrder()
+        else:
+            order = list(gDomain.actions)
+            random.shuffle(order)
         pattern = Pattern.fromOrder(order)
 
         if args.printPattern:
