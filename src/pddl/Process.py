@@ -21,9 +21,9 @@ class Process(Operation):
     def type(self):
         return OperationType.PROCESS
 
-    def ground(self, problem, initPredicates=None, dynamicPredicateNames=None) -> List[Process]:
+    def ground(self, problem) -> List[Process]:
         groundOps: List = []
-        for op in self.getGroundedOperations(problem, initPredicates, dynamicPredicateNames):
+        for op in self.getGroundedOperations(problem):
             event = Process()
             event.name = op.name
             event.preconditions = op.preconditions

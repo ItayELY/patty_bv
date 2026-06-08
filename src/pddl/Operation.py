@@ -120,7 +120,7 @@ class Operation:
     def __addEffects(self, node: p.OpEffectContext):
         self.effects = Effects.fromNode(node.getChild(1))
 
-    def getCombinations(self, problem: Problem):
+    def getCombinations(self, problem: Problem) -> List[Dict[str, str]]:
         subs: List[List[str]] = list()
         for parameter in self.parameters:
             pSubs = list()
@@ -130,127 +130,19 @@ class Operation:
                 pSubs += problem.objectsByType[childType.name]
             subs.append(pSubs)
 
+        combinations: List[Dict[str, str]] = list()
         for sub in itertools.product(*subs):
-            yield {parameter.name: sub[i] for i, parameter in enumerate(self.parameters)}
+            comb: Dict[str, str] = dict()
+            for i, parameter in enumerate(self.parameters):
+                comb[parameter.name] = sub[i]
+            combinations.append(comb)
 
-    @staticmethod
-    def _iterAndLiterals(formula):
-        """Yield Literals from AND-context preconditions only (not inside ORs)."""
-        if hasattr(formula, 'type') and formula.type == "OR":
-            return
-        for c in formula.conditions:
-            if isinstance(c, Literal):
-                yield c
-            elif hasattr(c, 'conditions'):
-                yield from Operation._iterAndLiterals(c)
+        return combinations
 
-    @staticmethod
-    def _constrainedCombinations(parameters, problem, initPredicates, dynamicPredicateNames, preconditions):
-        """Generate substitution dicts, pruning via static-predicate constraints.
-
-        Reorders parameters so variables shared with static preconditions are
-        bound earliest (topological sort on argument-position dependencies), then
-        uses a prefix index over init facts to reduce each variable's domain at
-        each recursive step.  For domains with no static constraints this falls
-        back to the original Cartesian product.
-        """
-        from collections import defaultdict
-
-        # Index: (pred_name, position, prefix_tuple) -> set of valid values at that position
-        prefix_index = defaultdict(set)
-        for atom in initPredicates:
-            if atom.name not in dynamicPredicateNames:
-                attrs = atom.attributes
-                for i in range(len(attrs)):
-                    prefix_index[(atom.name, i, tuple(attrs[:i]))].add(attrs[i])
-
-        # Static positive-literal preconditions only
-        param_set = {p.name for p in parameters}
-        static_lits = [
-            (lit.atom.name, lit.atom.attributes)
-            for lit in Operation._iterAndLiterals(preconditions)
-            if lit.sign == "+" and lit.atom.name not in dynamicPredicateNames
-        ]
-
-        # Topological sort: if var_i appears before var_j in a static predicate,
-        # var_i should be bound first.
-        must_precede = {name: set() for name in param_set}  # must_precede[x] = vars that must come before x
-        for (_pred, attrs) in static_lits:
-            var_pos = [(i, a) for i, a in enumerate(attrs) if a in param_set]
-            for k in range(len(var_pos)):
-                for l in range(k + 1, len(var_pos)):
-                    must_precede[var_pos[l][1]].add(var_pos[k][1])
-
-        orig_order = {p.name: i for i, p in enumerate(parameters)}
-        in_degree = {name: len(must_precede[name]) for name in param_set}
-        ready = sorted([n for n in param_set if in_degree[n] == 0], key=lambda x: orig_order[x])
-        sorted_names = []
-        while ready:
-            chosen = ready.pop(0)
-            sorted_names.append(chosen)
-            for name in param_set:
-                if chosen in must_precede[name]:
-                    must_precede[name].discard(chosen)
-                    in_degree[name] -= 1
-                    if in_degree[name] == 0:
-                        ready.append(name)
-                        ready.sort(key=lambda x: orig_order[x])
-        if len(sorted_names) != len(parameters):
-            sorted_names = [p.name for p in parameters]
-
-        # Full type domain per parameter
-        full_domain = {}
-        for p in parameters:
-            d = []
-            for childType in p.type.getMeAndMyChildren():
-                if childType.name in problem.objectsByType:
-                    d += problem.objectsByType[childType.name]
-            full_domain[p.name] = d
-
-        def get_domain(name, partial):
-            domain = set(full_domain[name])
-            for (pred_name, attrs) in static_lits:
-                for i, attr in enumerate(attrs):
-                    if attr == name:
-                        prefix = []
-                        ok = True
-                        for j in range(i):
-                            a = attrs[j]
-                            if a in param_set:
-                                if a not in partial:
-                                    ok = False
-                                    break
-                                prefix.append(partial[a])
-                            else:
-                                prefix.append(a)
-                        if ok:
-                            valid = prefix_index.get((pred_name, i, tuple(prefix)))
-                            if valid is not None:
-                                domain &= valid
-            return domain
-
-        def generate(idx, partial):
-            if idx == len(sorted_names):
-                yield dict(partial)
-                return
-            name = sorted_names[idx]
-            for val in get_domain(name, partial):
-                partial[name] = val
-                yield from generate(idx + 1, partial)
-            partial.pop(name, None)
-
-        yield from generate(0, {})
-
-    def getGroundedOperations(self, problem, initPredicates=None, dynamicPredicateNames=None):
-        if initPredicates is not None and dynamicPredicateNames is not None:
-            combinations = Operation._constrainedCombinations(
-                self.parameters, problem, initPredicates, dynamicPredicateNames, self.preconditions)
-        else:
-            combinations = self.getCombinations(problem)
+    def getGroundedOperations(self, problem):
+        combinations: List[Dict[str, str]] = self.getCombinations(problem)
         gOperations = []
         for subs in combinations:
-            if self.preconditions.violatesDisequalities(subs):
-                continue
             name = self.__getGroundedName(subs)
             preconditions = self.preconditions.ground(subs)
             effects = self.effects.ground(subs)
