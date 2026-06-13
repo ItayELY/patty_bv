@@ -1,0 +1,251 @@
+[33mcommit 6ad63aa71adbd540d160daf630a5c7e195449ebc[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: ItayELY <itay.elyashiv@gmail.com>
+Date:   Mon Jun 8 11:46:19 2026 +0000
+
+    revert grounding opt
+
+[33mcommit b9efea89468f2551260499ed1be252d447a9a953[m
+Author: ItayELY <72192889+ItayELY@users.noreply.github.com>
+Date:   Sun May 17 18:39:22 2026 +0300
+
+    Update README.md
+
+[33mcommit 69af7ac95e89569e16dd3cec9697550c76623996[m
+Merge: a3bd2239 7105a4cd
+Author: ItayELY <72192889+ItayELY@users.noreply.github.com>
+Date:   Tue May 26 20:47:09 2026 +0300
+
+    Merge pull request #6 from ItayELY/cloud_bench
+    
+    Cloud bench
+
+[33mcommit 7105a4cd445b1219f5b9252bdce84fec00b10746[m[33m ([m[1;31morigin/cloud_bench[m[33m, [m[1;32mcloud_bench[m[33m)[m
+Author: ItayELY <itay.elyashiv@gmail.com>
+Date:   Tue May 26 15:54:41 2026 +0000
+
+    Fixed Linear Assignments
+
+[33mcommit addcb84a95b2d0c16f5150601892cc6b368c2143[m
+Author: ItayELY <itay.elyashiv@gmail.com>
+Date:   Tue May 26 14:18:19 2026 +0000
+
+    Fixing Linear
+
+[33mcommit 7b7657c6c9c4cbbc5f9f2c1d6e3e200903eab516[m
+Author: ItayELY <itay.elyashiv@gmail.com>
+Date:   Tue May 26 11:15:05 2026 +0000
+
+    Fix For IPC2026
+
+[33mcommit a3bd22399f7ec291e2f094c181e0d7cb658b0149[m
+Merge: 6fd3af71 a9f68b6c
+Author: ItayELY <72192889+ItayELY@users.noreply.github.com>
+Date:   Sun May 17 18:31:24 2026 +0300
+
+    Merge pull request #5 from ItayELY/cloud_bench
+    
+    Cloud bench
+
+[33mcommit 6fd3af71839c4b10ade2e3544f0b91a1f893fa18[m
+Merge: b1b304a3 5a1f7eec
+Author: ItayELY <72192889+ItayELY@users.noreply.github.com>
+Date:   Sun May 17 18:30:54 2026 +0300
+
+    Merge pull request #4 from ItayELY/itay
+    
+    Remove accidental awscliv2.zip commit
+
+[33mcommit a9f68b6caddb00b7f3ac45678c73eeedfcd13f68[m[33m ([m[1;31mteam9/cloud_bench[m[33m)[m
+Author: ItayELY <itay.elyashiv@gmail.com>
+Date:   Sun May 17 14:05:59 2026 +0000
+
+    bitwidth_changes
+
+[33mcommit f72bb43a959a8ffcc71adad03185db6d07ad901e[m
+Author: ItayELY <itay.elyashiv@gmail.com>
+Date:   Sun May 17 13:17:29 2026 +0000
+
+    width 30
+
+[33mcommit 65581e687f1d9abeb82ebdac6b208cbf50a506f7[m
+Author: ItayELY <itay.elyashiv@gmail.com>
+Date:   Sun May 17 13:13:29 2026 +0000
+
+    change
+
+[33mcommit 03655a442853a71aa30d9af0f5121b42fa97248a[m
+Author: ItayELY <itay.elyashiv@gmail.com>
+Date:   Sun May 17 13:11:33 2026 +0000
+
+    Fix three soundness bugs in BV encoding (fo-farmland, fo-sailing)
+    
+    1. getEffStepRules (PDDL2SMTBV): called fromPddl without bv=True for
+       non-simple linear increment effects. Mixed BV/Real types hit the
+       except:pass in __binary, leaving aux variables unconstrained.
+       Solver then assigned phantom resource values.
+    
+    2. fromPddl * operator (SMTExpression): multiplying two already-scaled
+       BV values gave a scale_factor^2 result. Added BVUDiv by scale_factor
+       after every * in BV mode to compensate.
+    
+    3. BVMul ITE optimization (__binary): replaced v*k with
+       Ite(v>0, k, 0), which is only correct for binary (0/1) action
+       counts, not for state variables like velocity. Replaced with
+       BVMul for all non-trivial cases.
+    
+    4. main_bv.py loop: always broke after finding any plan, even invalid
+       ones. Now only breaks when isValid=True so higher bounds are tried.
+    
+    Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+[33mcommit 39e28744cdc6d1ce49a3eb66b94ee04eecfe4fae[m
+Author: ItayELY <itay.elyashiv@gmail.com>
+Date:   Sun May 17 12:10:13 2026 +0000
+
+    combine_workers
+
+[33mcommit b6910f48de2c1adcb61f20fa19cab211650dedfc[m
+Author: ItayELY <itay.elyashiv@gmail.com>
+Date:   Sun May 17 11:51:26 2026 +0000
+
+    multiprocessing
+
+[33mcommit 0da80cacfccd82a7cc6025f04c63a352841999e9[m
+Author: ItayELY <itay.elyashiv@gmail.com>
+Date:   Sun May 17 11:40:33 2026 +0000
+
+    fixed executable bench
+
+[33mcommit dd74fca71f4d01fcea7fa6b4e90a04b37c72f9b5[m
+Author: ItayELY <itay.elyashiv@gmail.com>
+Date:   Sun May 17 11:38:45 2026 +0000
+
+    Track benchmark instance CSVs and fix gitignore
+    
+    Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+[33mcommit ff534451af611c73a5a9314d63438ae6de949c73[m
+Author: ItayELY <itay.elyashiv@gmail.com>
+Date:   Sun May 17 11:32:52 2026 +0000
+
+    for_remote
+
+[33mcommit 5a1f7eecf4d0eea0791af1131b20f427906fc616[m[33m ([m[1;31morigin/itay[m[33m, [m[1;32mitay[m[33m)[m
+Author: ItayELY <itay.elyashiv@gmail.com>
+Date:   Fri May 15 19:28:07 2026 +0000
+
+    Remove accidental awscliv2.zip commit
+    
+    Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+[33mcommit b1b304a33edabeecffe7e8cf954c5e571d2b5762[m
+Merge: c2ec6d4e a7df9b81
+Author: ItayELY <72192889+ItayELY@users.noreply.github.com>
+Date:   Thu May 14 20:10:33 2026 +0300
+
+    Merge pull request #3 from ItayELY/itay
+    
+    fix output format
+
+[33mcommit a7df9b8117c7b4e8a040ce1d27732690af402c14[m
+Author: ItayELY <itay.elyashiv@gmail.com>
+Date:   Thu May 14 10:30:05 2026 +0000
+
+    fix output format
+
+[33mcommit c2ec6d4e4d9243f62f59e80c8fd05b496eca6159[m
+Merge: 2ba7727e 1882a5d3
+Author: ItayELY <72192889+ItayELY@users.noreply.github.com>
+Date:   Thu May 14 13:14:59 2026 +0300
+
+    Merge pull request #2 from ItayELY/itay
+    
+    fix solver
+
+[33mcommit 1882a5d31ebbaf4fbdc5da70d7f4daab3b4dded9[m
+Author: ItayELY <itay.elyashiv@gmail.com>
+Date:   Thu May 14 10:02:43 2026 +0000
+
+    fix solver
+
+[33mcommit 2ba7727ea54a28b2e7b6208e07d5d75ed347c6b3[m
+Merge: 651a813d 8e3ae18a
+Author: ItayELY <72192889+ItayELY@users.noreply.github.com>
+Date:   Thu May 14 12:54:31 2026 +0300
+
+    Merge pull request #1 from ItayELY/itay
+    
+    Itay
+
+[33mcommit 8e3ae18a8648c63221f02c9edbe33f1cc5e16880[m
+Author: ItayELY <itay.elyashiv@gmail.com>
+Date:   Thu May 14 09:52:06 2026 +0000
+
+    for submission test
+
+[33mcommit 2f5193298722cbe094040cda11ab3686e1eaac3b[m
+Author: ItayELY <itay.elyashiv@gmail.com>
+Date:   Sat May 9 13:25:50 2026 +0000
+
+    Add Apptainer Recipe and IPC 2026 Agile track submission scripts
+    
+    - Recipe: Apptainer container definition (ubuntu:24.04, python3, bitwuzla)
+    - run-lnp-agile: IPC submission run script for LNP Agile track
+    - compile: local install script for Python venv
+    - .gitignore: exclude .venv, planner_sandbox, planner.sif, bitwuzla
+    
+    Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+[33mcommit 798cbdacf837d2bf69b7e99f850ceca163452ce1[m
+Author: ItayELY <itay.elyashiv@gmail.com>
+Date:   Sat May 2 16:36:51 2026 +0000
+
+    chkpt
+
+[33mcommit 02649c7bf9ef7dcf9da2c9f3c759fea854183463[m
+Author: root <itay.elyashiv@gmail.com>
+Date:   Sun Apr 26 08:45:40 2026 +0000
+
+    itay commit
+
+[33mcommit 651a813d9c61b9b2926dcc9abdeeb05b4b2acb97[m
+Merge: 38f52b1f 1950b739
+Author: Matteo Cardellini <me@matteocardellini.it>
+Date:   Mon Aug 11 08:57:23 2025 +0200
+
+    Merge pull request #3 from matteocarde/matteocarde-patch-1
+    
+    Update README.md
+
+[33mcommit 38f52b1f08185b1390263224baae16ae8ec7cbf9[m
+Author: Matteo Cardellini <me@matteocardellini.it>
+Date:   Mon Aug 11 08:56:50 2025 +0200
+
+    Update LICENSE
+
+[33mcommit 1950b73936c6b628c94e0a7152dc80ee9c6c6fc7[m[33m ([m[1;31morigin/matteocarde-patch-1[m[33m)[m
+Author: Matteo Cardellini <me@matteocardellini.it>
+Date:   Mon Aug 11 08:54:41 2025 +0200
+
+    Update README.md
+
+[33mcommit 9cd95c61e380a3400ae86e1e3102baf0d8e69998[m
+Author: Matteo Cardellini <me@matteocardellini.it>
+Date:   Tue Feb 20 10:43:42 2024 -0800
+
+    Update README.md
+
+[33mcommit 7c15b9064260e34127cbf836c2a94649b7f0e1fa[m
+Merge: 09c65a6f 71c32298
+Author: Matteo Cardellini <me@matteocardellini.it>
+Date:   Tue Aug 8 08:52:39 2023 +0200
+
+    Merge pull request #2 from matteocarde/dev
+    
+    Removed unused files
+
+[33mcommit 71c3229815f58e65ab0e1ee273c4f78c7af5f010[m
+Author: Matteo Cardellini <matteo.cardellini@surgiq.com>
+Date:   Tue Aug 8 08:52:03 2023 +0200
+
+    Removed unused files

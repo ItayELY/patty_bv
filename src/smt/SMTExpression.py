@@ -322,21 +322,22 @@ class SMTExpression:
 
     @classmethod
     def fromPddl(cls, predicate: BinaryPredicate or Literal or Constant,
-                 variables: Dict[Atom, SMTExpression], bv=False, width = 0, scale_factor=1) -> SMTExpression or float:
+                 variables: Dict[Atom, SMTExpression], bv=False, width = 0, scale_factor=1,
+                 effect_scale=None) -> SMTExpression or float:
         if isinstance(predicate, BinaryPredicate):
             if bv and predicate.operator == "*" and scale_factor > 1:
                 lhs_is_const = isinstance(predicate.lhs, Constant)
                 rhs_is_const = isinstance(predicate.rhs, Constant)
                 if lhs_is_const != rhs_is_const:
                     # One side is a pure constant, other is a variable expression.
-                    # Variables are already scaled by scale_factor; multiplying a
-                    # scale_factor-scaled constant by a scaled variable would give
-                    # scale^2 instead of scale.  Apply the constant as a rational
-                    # multiplier: numerator*var / denominator (BV integer division).
+                    # Variables are stored at effect_scale; the goal expression uses
+                    # scale_factor (= goal_scale).  Fetch the variable already rescaled
+                    # to scale_factor, then apply the rational constant p/q via integer
+                    # division — this gives c * actual * scale_factor correctly.
                     const_pred = predicate.lhs if lhs_is_const else predicate.rhs
                     var_pred   = predicate.rhs if lhs_is_const else predicate.lhs
                     c = Fraction(str(float(const_pred.value))).limit_denominator(10000)
-                    var_expr = SMTExpression.fromPddl(var_pred, variables, bv=bv, width=width, scale_factor=scale_factor)
+                    var_expr = SMTExpression.fromPddl(var_pred, variables, bv=bv, width=width, scale_factor=scale_factor, effect_scale=effect_scale)
                     # _bv_const_mul requires a non-negative multiplier; handle sign separately
                     abs_numer = abs(c.numerator)
                     scaled = _bv_const_mul(var_expr.expression, abs_numer, width)
@@ -350,11 +351,20 @@ class SMTExpression:
                     result.type = BVType(width)
                     result.expression = scaled
                     return result
-            lhs = SMTExpression.fromPddl(predicate.lhs, variables, bv=bv, width=width, scale_factor=scale_factor)
-            rhs = SMTExpression.fromPddl(predicate.rhs, variables, bv=bv, width=width, scale_factor=scale_factor)
+            lhs = SMTExpression.fromPddl(predicate.lhs, variables, bv=bv, width=width, scale_factor=scale_factor, effect_scale=effect_scale)
+            rhs = SMTExpression.fromPddl(predicate.rhs, variables, bv=bv, width=width, scale_factor=scale_factor, effect_scale=effect_scale)
             return SMTExpression.opByString(predicate.operator, lhs, rhs)
         if isinstance(predicate, Literal):
-            return variables[predicate.getAtom()]
+            bv_var = variables[predicate.getAtom()]
+            if bv and effect_scale is not None and scale_factor > effect_scale:
+                # State variables are stored at effect_scale; rescale to scale_factor.
+                ratio = scale_factor // effect_scale
+                result = SMTExpression()
+                result.variables = bv_var.variables
+                result.type = BVType(width)
+                result.expression = _bv_const_mul(bv_var.expression, ratio, width)
+                return result
+            return bv_var
         if isinstance(predicate, Constant):
             if not bv:
                 return predicate.value

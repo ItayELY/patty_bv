@@ -49,14 +49,21 @@ def _compute_scale_factor(consts):
 
 
 def _effect_consts(domain, problem):
-    """Constants from action effects, preconditions, and init (not goal)."""
+    """Constants from action effects, preconditions, and init (not goal).
+
+    Init assignments are only included when the fluent actually appears in some
+    action — fluents that are initialised but never read or written (e.g.
+    duration-* cost fields in pathwaysmetric) would otherwise inflate the scale
+    factor and make every state variable unnecessarily large in BV.
+    """
     consts = []
     for action in domain.actions:
         _collect_consts(action.preconditions, consts)
         for eff in action.effects:
             _collect_consts(eff, consts)
     for assignment in problem.init:
-        _collect_consts(assignment, consts)
+        if not isinstance(assignment, BinaryPredicate) or assignment.getAtom() in domain.functions:
+            _collect_consts(assignment, consts)
     return consts
 
 
@@ -189,7 +196,7 @@ class PDDL2SMTBV:
                 # tp = (type(condition.rhs.value))
                 # if type(condition.rhs.value) in (int, float):
                     # condition.rhs = BV(int(condition.rhs.value), self.width)
-                expr = SMTExpression.fromPddl(condition, tVars.valueVariables, bv=True, width=self.width, scale_factor=self.goal_scale)
+                expr = SMTExpression.fromPddl(condition, tVars.valueVariables, bv=True, width=self.width, scale_factor=self.goal_scale, effect_scale=self.effect_scale)
                 rules.append(expr)
             elif isinstance(condition, Literal):
                 if condition.sign == "+":
