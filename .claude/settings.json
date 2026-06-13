@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(timeout 60 python3 main_bv.py -o files/IPC2026/2048/domain.pddl -f files/IPC2026/2048/pfile1.pddl --solver bitwuzla --pattern arpg -n 5 -v 3)",
-      "Bash(timeout 90 python3 main_bv.py -o files/IPC2026/sailing-wind/domain.pddl -f files/IPC2026/sailing-wind/problem_0.pddl --solver bitwuzla --pattern arpg -n 5 -v 4)"
+      "Bash(timeout 90 python3 main_bv.py -o files/IPC2026/sailing-wind/domain.pddl -f files/IPC2026/sailing-wind/problem_0.pddl --solver bitwuzla --pattern arpg -n 5 -v 4)",
+      "Bash(timeout 60 python main.py -o files/farmland/domain.pddl -f files/farmland/instances/instance_2_200_1229.pddl -n 50 -v 4)",
+      "Bash(timeout 60 python main.py -o files/farmland/domain.pddl -f files/farmland/instances/instance_2_200_1229.pddl -n 5 -v 4)"
     ]
   }
 }

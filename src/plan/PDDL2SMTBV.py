@@ -67,6 +67,21 @@ def _effect_consts(domain, problem):
     return consts
 
 
+def _compute_max_actions(problem):
+    """Maximum action repetitions per step: use the largest initial fluent value so
+    that a single-step plan can transfer all resources without needing many bounds."""
+    max_val = 50
+    for fact in problem.init:
+        if isinstance(fact, BinaryPredicate) and fact.operator in ("=", "assign"):
+            try:
+                v = abs(float(str(fact.rhs)))
+                if v > max_val:
+                    max_val = int(v) + 1
+            except Exception:
+                pass
+    return max_val
+
+
 def _compute_min_width(domain, problem, effect_scale, goal_scale):
     """Compute BV width to hold state values and goal-scaled constants.
 
@@ -104,7 +119,7 @@ class PDDL2SMTBV:
     domain: GroundedDomain
     problem: Problem
 
-    def __init__(self, domain: GroundedDomain, problem: Problem, pattern: Pattern, bound: int, encoding="non-linear", width=None, max_actions=50,
+    def __init__(self, domain: GroundedDomain, problem: Problem, pattern: Pattern, bound: int, encoding="non-linear", width=None, max_actions=None,
                  binaryActions=10, rollBound=0, hasEffectAxioms=False):
         self.domain = domain
         self.problem = problem
@@ -112,7 +127,7 @@ class PDDL2SMTBV:
         self.encoding = encoding
         self.rollBound = rollBound
         self.hasEffectAxioms = hasEffectAxioms
-        self.max_actions = max_actions
+        self.max_actions = max_actions if max_actions is not None else _compute_max_actions(problem)
         ec = _effect_consts(domain, problem)
         gc = []
         _collect_consts(problem.goal, gc)
@@ -124,7 +139,7 @@ class PDDL2SMTBV:
         self.scale_factor = self.goal_scale
         self.width = width if width is not None else _compute_min_width(domain, problem, self.effect_scale, self.goal_scale)
         # action counts are small (bounded by max_actions); use a narrow BV to keep solver fast
-        self.action_width = max(int(max_actions + 1).bit_length() + 1, 8)
+        self.action_width = max(int(self.max_actions + 1).bit_length() + 1, 8)
 
         self.transitionVariables: [TransitionVariablesBV] = list()
 
