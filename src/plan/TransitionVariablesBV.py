@@ -45,6 +45,12 @@ class TransitionVariablesBV(TransitionVariables):
                     variables[action][atom] = SMTBVVariable(f"d_{{{action}}}_{index}({atom})", self.width)
                 for atom in self.predicates:
                     variables[action][atom] = SMTBoolVariable(f"d_{{{action}}}_{index}({atom})")
+            else:
+                # Numeric-only delta axioms: give each action its own BV variable
+                # per numeric fluent so the delta chain stays as small equality
+                # rules rather than one giant accumulated expression.
+                for atom in self.functions:
+                    variables[action][atom] = SMTBVVariable(f"d_{{{action}}}_{index}({atom})", self.width)
         return variables
 
     def __computeActionVariables(self, index: int):

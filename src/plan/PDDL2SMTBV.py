@@ -252,22 +252,32 @@ class PDDL2SMTBV:
         prevAction: Action or None = None
         for action in self.pattern:
             if not prevAction:
-                # First action in the order copies the value from previous step
-                for v in self.domain.allAtoms:
+                # First action copies values from the previous step.
+                # Predicates: Python dict substitution (no new SMT variable).
+                # Numeric fluents: emit an equality axiom so downstream rules
+                # reference a fresh SMT variable rather than the accumulated
+                # expression — this keeps individual rule sizes small.
+                for v in self.domain.predicates:
                     if self.hasEffectAxioms:
                         rules.append(stepVars.deltaVariables[action][v] == prevVars.valueVariables[v])
                     else:
                         stepVars.deltaVariables[action][v] = prevVars.valueVariables[v]
+                for v in self.domain.functions:
+                    rules.append(stepVars.deltaVariables[action][v] == prevVars.valueVariables[v])
                 prevAction = action
                 continue
 
             # Case a) Not influenced
             notInfluenced = self.domain.allAtoms - (prevAction.getInfluencedAtoms())
             for v in notInfluenced:
-                if self.hasEffectAxioms:
-                    rules.append(stepVars.deltaVariables[action][v] == stepVars.deltaVariables[prevAction][v])
+                if v in self.domain.predicates:
+                    if self.hasEffectAxioms:
+                        rules.append(stepVars.deltaVariables[action][v] == stepVars.deltaVariables[prevAction][v])
+                    else:
+                        stepVars.deltaVariables[action][v] = stepVars.deltaVariables[prevAction][v]
                 else:
-                    stepVars.deltaVariables[action][v] = stepVars.deltaVariables[prevAction][v]
+                    # Numeric fluent: axiom keeps the chain shallow
+                    rules.append(stepVars.deltaVariables[action][v] == stepVars.deltaVariables[prevAction][v])
 
             # Case b) Boolean
             for v in prevAction.getAddList() | prevAction.getDelList():
@@ -285,26 +295,22 @@ class PDDL2SMTBV:
                         rules.append(stepVars.deltaVariables[action][v] == d_bv.AND(b_n == to_bv(0, self.action_width)))
                     else:
                         stepVars.deltaVariables[action][v] = d_bv.AND(b_n == to_bv(0, self.action_width))
-                
-            # Case c) Numeric increases or decreases
+
+            # Case c) Numeric increases or decreases — always emit axioms so the
+            # delta for each action is a single small rule, not a chain of
+            # nested shift+add trees that grows with every preceding action.
             if not prevAction.hasNonSimpleLinearIncrement(self.encoding):
                 modifications = [(+1, prevAction.getIncreases()), (-1, prevAction.getDecreases())]
                 for sign, modificationDict in modifications:
                     for v, funct in modificationDict.items():
-
                         d_bv = stepVars.deltaVariables[prevAction][v]
                         k = SMTNumericVariable.fromPddl(funct, stepVars.deltaVariables[prevAction], bv=True, width=self.width, scale_factor=self.effect_scale)
                         b_n = self._ext(stepVars.actionVariables[prevAction])
                         if sign > 0:
-                            if self.hasEffectAxioms:
-                                rules.append(stepVars.deltaVariables[action][v] == d_bv + (k * b_n))
-                            else:
-                                stepVars.deltaVariables[action][v] = d_bv + (k * b_n)
+                            rules.append(stepVars.deltaVariables[action][v] == d_bv + (k * b_n))
                         else:
-                            if self.hasEffectAxioms:
-                                rules.append(stepVars.deltaVariables[action][v] == d_bv - (k * b_n))
-                            else:
-                                stepVars.deltaVariables[action][v] = d_bv - (k * b_n)
+                            rules.append(stepVars.deltaVariables[action][v] == d_bv - (k * b_n))
+
             # Case d) Numeric assignments
             for v in prevAction.getAssList():
                 if self.hasEffectAxioms:
