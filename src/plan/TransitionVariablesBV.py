@@ -7,16 +7,17 @@ from src.smt.SMTBoolVariable import SMTBoolVariable
 
 
 class TransitionVariablesBV(TransitionVariables):
-    def __init__(self, predicates, functions, assList, pattern, index, hasPlaceholders, width=10, action_width=None):
+    def __init__(self, predicates, functions, assList, pattern, index, hasPlaceholders, width=10, action_width=None, axiom_fluents=None):
         self.width = width
         self.action_width = action_width if action_width is not None else width
         # We do NOT call super().__init__ because it would trigger the mangled parent methods
-        
+
         self.functions = functions
         self.predicates = predicates
         self.assList = assList
         self.pattern = pattern
-        
+        self._axiom_fluents = axiom_fluents or set()
+
         # Now we call the local BV methods defined below
         self.valueVariables = self.__computeValueVariables(index)
         self.deltaVariables = self.__computeDeltaVariables(index, hasPlaceholders)
@@ -34,7 +35,7 @@ class TransitionVariablesBV(TransitionVariables):
             variables[atom] = SMTBoolVariable(f"{atom}_{index}")
         return variables
 
-    # IMPORTANT: You must also override Delta variables, 
+    # IMPORTANT: You must also override Delta variables,
     # otherwise they will still be Reals from the parent class!
     def __computeDeltaVariables(self, index: int, hasPlaceholders: bool) -> Dict[Action, Dict[Atom, SMTBVVariable]]:
         variables = dict()
@@ -46,10 +47,10 @@ class TransitionVariablesBV(TransitionVariables):
                 for atom in self.predicates:
                     variables[action][atom] = SMTBoolVariable(f"d_{{{action}}}_{index}({atom})")
             else:
-                # Numeric-only delta axioms: give each action its own BV variable
-                # per numeric fluent so the delta chain stays as small equality
-                # rules rather than one giant accumulated expression.
-                for atom in self.functions:
+                # Pre-allocate BV variables only for fluents that will use delta axioms.
+                # Other fluents are populated on demand via Python dict assignment in
+                # getDeltaStepRules (cheaper for fluents with shallow accumulation).
+                for atom in self._axiom_fluents:
                     variables[action][atom] = SMTBVVariable(f"d_{{{action}}}_{index}({atom})", self.width)
         return variables
 
