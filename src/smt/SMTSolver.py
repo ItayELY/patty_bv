@@ -1,5 +1,9 @@
-from pysmt.logics import QF_LRA, QF_NRA
-from pysmt.shortcuts import Portfolio
+import io
+from pysmt.logics import QF_LRA, QF_NRA, QF_LIRA, QF_LIA
+from pysmt.shortcuts import Portfolio, get_free_variables, And
+from pysmt.smtlib.script import SmtLibScript, SmtLibCommand
+from pysmt.typing import INT, REAL
+import pysmt.smtlib.commands as smtcmd
 from typing import Set, List
 
 from src.pddl.NumericPlan import NumericPlan
@@ -51,7 +55,38 @@ class SMTSolver:
         self.solver.exit()
         pass
 
+    def _write_smtlib_dump(self, path="smtlib_dump_regular"):
+        formulas = [a.expression for a in self.assertions]
+        all_vars = set()
+        for f in formulas:
+            all_vars |= get_free_variables(f)
+
+        types = {v.get_type() for v in all_vars}
+        has_int = INT in types
+        has_real = REAL in types
+        if has_int and has_real:
+            logic = QF_LIRA
+        elif has_int:
+            logic = QF_LIA
+        else:
+            logic = QF_LRA
+
+        script = SmtLibScript()
+        script.add_command(SmtLibCommand(smtcmd.SET_LOGIC, [logic]))
+        for var in sorted(all_vars, key=lambda v: v.symbol_name()):
+            script.add_command(SmtLibCommand(smtcmd.DECLARE_FUN, [var]))
+        for f in formulas:
+            script.add_command(SmtLibCommand(smtcmd.ASSERT, [f]))
+        script.add_command(SmtLibCommand(smtcmd.CHECK_SAT, []))
+
+        buf = io.StringIO()
+        script.serialize(buf)
+        with open(path, "w") as f:
+            f.write(buf.getvalue())
+
     def getSolution(self) -> SMTSolution or bool:
+        if __import__('os').environ.get('SMTLIB_DUMP'):
+            self._write_smtlib_dump()
         found = self.solver.solve()
         if not found:
             return False

@@ -1,8 +1,13 @@
+import io
 from typing import Set, List
 
 import pysmt.operators as op
+import pysmt.smtlib.commands as smtcmd
 # from bitwuzla import TermManager, Bitwuzla, Options, Kind, Result, Option
 from bitwuzla import TermManager, Bitwuzla, Options, Kind, Result, Option
+from pysmt.logics import QF_BV
+from pysmt.shortcuts import get_free_variables
+from pysmt.smtlib.script import SmtLibScript, SmtLibCommand
 from src.pddl.NumericPlan import NumericPlan
 from src.plan.PDDL2SMT import PDDL2SMT
 from src.smt.SMTExpression import SMTExpression
@@ -173,7 +178,28 @@ class SMTSolver:
     def exit(self):
         pass
 
+    def _write_smtlib_dump(self, path="smtlib_dump"):
+        formulas = [a.expression for a in self.assertions]
+        all_vars = set()
+        for f in formulas:
+            all_vars |= get_free_variables(f)
+
+        script = SmtLibScript()
+        script.add_command(SmtLibCommand(smtcmd.SET_LOGIC, [QF_BV]))
+        for var in sorted(all_vars, key=lambda v: v.symbol_name()):
+            script.add_command(SmtLibCommand(smtcmd.DECLARE_FUN, [var]))
+        for f in formulas:
+            script.add_command(SmtLibCommand(smtcmd.ASSERT, [f]))
+        script.add_command(SmtLibCommand(smtcmd.CHECK_SAT, []))
+
+        buf = io.StringIO()
+        script.serialize(buf)
+        with open(path, "w") as f:
+            f.write(buf.getvalue())
+
     def getSolution(self) -> SMTSolution or bool:
+        if __import__('os').environ.get('SMTLIB_DUMP'):
+            self._write_smtlib_dump()
         result = self._solver.check_sat()
         if result != Result.SAT:
             return False
