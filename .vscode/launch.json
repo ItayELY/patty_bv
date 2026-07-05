@@ -13,14 +13,14 @@
                 "-o",
                 "files/ipc-2023/sugar/domain.pddl",
                 "-f",
-                "files/ipc-2023/sugar/instances/pfile19.pddl",
+                "files/ipc-2023/sugar/instances/pfile01.pddl",
                 "--pattern",
                 "arpg",
                 "--save-smt", "file_smt",
                 "-pp",
                 "-v",
                 "4",
-                "--solver", "bitwuzla",
+                "--solver", "cvc5",
 
             ]
         }
