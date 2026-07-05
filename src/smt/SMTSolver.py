@@ -24,7 +24,7 @@ class SMTSolver:
         # solver = ("cvc5")#, {"solve-int-as-bv": "10"})
 
         self.solver: Portfolio = Portfolio([solver],
-                                           logic=QF_LRA,
+                                           logic=QF_NRA,
                                            incremental=False, # false for cvc5 BV #True,
                                            generate_models=True,)
 

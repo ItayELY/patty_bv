@@ -11,16 +11,16 @@
             "console": "integratedTerminal",
             "args": [
                 "-o",
-                "files/ipc-2023/sugar/domain.pddl",
+                "files/line-exchange/domain.pddl",
                 "-f",
-                "files/ipc-2023/sugar/instances/pfile01.pddl",
+                "files/line-exchange/instances/5_10_25_10.pddl",
                 "--pattern",
                 "arpg",
                 "--save-smt", "file_smt",
                 "-pp",
                 "-v",
                 "4",
-                "--solver", "cvc5",
+                "--solver", "bitwuzla",
 
             ]
         }
