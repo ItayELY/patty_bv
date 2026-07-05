@@ -87,9 +87,9 @@ def main():
             # pddl2smt.printRules
             plan: NumericPlan
             if args.saveSMT:
-                filename = f"{args.saveSMT}-{bound}.smt"
+                filename = f"{args.saveSMT}-{bound}_bv.smt"
                 console.log(f"Saving to {filename}", LogPrintLevel.STATS)
-                with open(f"{args.saveSMT}-{bound}.smt", "w") as f:
+                with open(f"{args.saveSMT}-{bound}_bv.smt", "w") as f:
                     f.write(str(pddl2smt))
             if args.deep:
                 plan = solver.optimizeBinary()
@@ -102,9 +102,9 @@ def main():
             console.log(f"Bound {bound} - Rules = {pddl2smt.getNRules()}", LogPrintLevel.STATS)
 
             if args.saveSMT:
-                filename = f"{args.saveSMT}-{bound}.smt"
+                filename = f"{args.saveSMT}-{bound}_bv.smt"
                 console.log(f"Saving to {filename}", LogPrintLevel.STATS)
-                with open(f"{args.saveSMT}-{bound}.smt", "w") as f:
+                with open(f"{args.saveSMT}-{bound}_bv.smt", "w") as f:
                     f.write(str(pddl2smt))
 
             if not plan:

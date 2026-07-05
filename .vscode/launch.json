@@ -11,9 +11,9 @@
             "console": "integratedTerminal",
             "args": [
                 "-o",
-                "files/farmland/domain.pddl",
+                "files/ipc-2023/sugar/domain.pddl",
                 "-f",
-                "files/farmland/instances/instance_2_100_1229.pddl",
+                "files/ipc-2023/sugar/instances/pfile19.pddl",
                 "--pattern",
                 "arpg",
                 "--save-smt", "file_smt",
