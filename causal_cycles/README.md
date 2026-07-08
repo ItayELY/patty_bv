@@ -20,14 +20,21 @@ durative-action `(at start ...)`/`(at end ...)` wrappers.
 # single domain, list every influence edge
 python3 -m causal_cycles.cli files/tpp/domain.pddl -v
 
-# scan a whole benchmark tree, write one .dot file per domain
+# see it visually - writes a self-contained, interactive .html per domain
+# (draggable nodes, cyclic nodes/edges highlighted red); open it in any
+# browser, no graphviz install required
+python3 -m causal_cycles.cli files/tpp/domain.pddl --html-dir /tmp/graphs
+open /tmp/graphs/domain.html   # or just double-click it
+
+# scan a whole benchmark tree, write one .dot file per domain instead
 python3 -m causal_cycles.cli files -r --dot-dir /tmp/dots
 
 # use in CI-style checks: exit 1 if any scanned domain has a cycle
 python3 -m causal_cycles.cli files -r --fail-on-cycle
 ```
 
-Render a `.dot` file with Graphviz (nodes/edges on a cycle are colored red):
+If you have Graphviz installed, `.dot` files render too (nodes/edges on a
+cycle are colored red):
 
 ```bash
 dot -Tpng /tmp/dots/tpp.dot -o tpp.png
@@ -37,6 +44,9 @@ dot -Tpng /tmp/dots/tpp.dot -o tpp.png
 
 - `sexpr.py` — minimal dependency-free S-expression reader for PDDL.
 - `influence_graph.py` — walks a parsed domain's effects into a `DiGraph`.
-- `graph.py` — small directed graph with Tarjan SCC-based cycle detection
-  and Graphviz DOT export (no networkx dependency).
+- `graph.py` — small directed graph with Tarjan SCC-based cycle detection,
+  Graphviz DOT export, and per-edge/per-node cycle membership (no networkx
+  dependency).
+- `html_render.py` — renders a `DiGraph` as a self-contained interactive
+  HTML page (inline vanilla-JS force-directed layout, no CDN/graphviz).
 - `cli.py` — command-line entry point.
