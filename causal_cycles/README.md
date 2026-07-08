@@ -16,28 +16,38 @@ durative-action `(at start ...)`/`(at end ...)` wrappers.
 
 ## Usage
 
+By default this just prints a text description of the graph — variables,
+every edge (with the action name(s) that cause it), and any cycles:
+
 ```bash
-# single domain, list every influence edge
-python3 -m causal_cycles.cli files/tpp/domain.pddl -v
-
-# see it visually - writes a self-contained, interactive .html per domain
-# (draggable nodes, cyclic nodes/edges highlighted red); open it in any
-# browser, no graphviz install required
-python3 -m causal_cycles.cli files/tpp/domain.pddl --html-dir /tmp/graphs
-open /tmp/graphs/domain.html   # or just double-click it
-
-# scan a whole benchmark tree, write one .dot file per domain instead
-python3 -m causal_cycles.cli files -r --dot-dir /tmp/dots
-
-# use in CI-style checks: exit 1 if any scanned domain has a cycle
-python3 -m causal_cycles.cli files -r --fail-on-cycle
+python3 -m causal_cycles.cli files/tpp/domain.pddl
 ```
 
-If you have Graphviz installed, `.dot` files render too (nodes/edges on a
-cycle are colored red):
+```
+=== files/tpp/domain.pddl ===
+  variables (6): bought, drive-cost, on-sale, price, request, total-cost
+  edges:
+    bought -> on-sale  via: buy-allneeded
+    on-sale -> bought  via: buy-all
+    ...
+  1 cycle(s) found:
+    on-sale -> bought -> on-sale
+```
+
+Other options:
 
 ```bash
-dot -Tpng /tmp/dots/tpp.dot -o tpp.png
+# scan a whole benchmark tree, exit 1 if any domain has a cycle (CI-style)
+python3 -m causal_cycles.cli files -r --fail-on-cycle
+
+# write a self-contained, interactive .html per domain instead (draggable
+# nodes, cyclic nodes/edges highlighted red, hover an edge for its action
+# name) - only useful if you have a browser to open it with
+python3 -m causal_cycles.cli files/tpp/domain.pddl --html-dir /tmp/graphs
+
+# or write a Graphviz .dot file per domain (needs `apt-get install graphviz`
+# to render): dot -Tpng /tmp/dots/tpp.dot -o tpp.png
+python3 -m causal_cycles.cli files -r --dot-dir /tmp/dots
 ```
 
 ## Files

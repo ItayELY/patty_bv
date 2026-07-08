@@ -2,8 +2,7 @@
 
 Usage:
     python -m causal_cycles.cli files/gardening/domain.pddl
-    python -m causal_cycles.cli files/tpp/domain.pddl --html-dir /tmp/graphs
-    python -m causal_cycles.cli files/ --recursive --dot-dir /tmp/dots
+    python -m causal_cycles.cli files/ --recursive --fail-on-cycle
 """
 from __future__ import annotations
 
@@ -41,8 +40,8 @@ def _collect_domain_files(paths: List[str], recursive: bool) -> List[Path]:
     return files
 
 
-def _report_for(path: Path, graph: DiGraph, verbose: bool) -> bool:
-    """Prints a report for one domain file. Returns True iff a cycle exists."""
+def _report_for(path: Path, graph: DiGraph) -> bool:
+    """Prints a text description of one domain's influence graph. Returns True iff a cycle exists."""
     print(f"\n=== {path} ===")
     if not graph.nodes:
         print("  no numeric variables / effects found")
@@ -50,11 +49,13 @@ def _report_for(path: Path, graph: DiGraph, verbose: bool) -> bool:
 
     print(f"  variables ({len(graph.nodes)}): {', '.join(sorted(graph.nodes))}")
 
-    if verbose:
+    if graph.edges:
         print("  edges:")
         for (s, t), labels in sorted(graph.edges.items()):
-            via = f"  [{', '.join(sorted(labels))}]" if labels else ""
+            via = f"  via: {', '.join(sorted(labels))}" if labels else ""
             print(f"    {s} -> {t}{via}")
+    else:
+        print("  edges: none")
 
     cycles = graph.cycles()
     if not cycles:
@@ -71,7 +72,6 @@ def main(argv: List[str] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paths", nargs="+", help="domain.pddl file(s) or directories to scan")
     parser.add_argument("-r", "--recursive", action="store_true", help="recurse into directories")
-    parser.add_argument("-v", "--verbose", action="store_true", help="print every influence edge")
     parser.add_argument("--dot-dir", help="write a Graphviz .dot file per domain into this directory")
     parser.add_argument(
         "--html-dir",
@@ -94,7 +94,7 @@ def main(argv: List[str] = None) -> int:
     any_cycle = False
     for path in domain_files:
         graph = build_influence_graph_from_file(str(path))
-        has_cycle = _report_for(path, graph, args.verbose)
+        has_cycle = _report_for(path, graph)
         any_cycle = any_cycle or has_cycle
 
         if args.dot_dir:
