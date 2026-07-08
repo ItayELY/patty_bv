@@ -2,6 +2,7 @@
 
 Usage:
     python -m causal_cycles.cli files/gardening/domain.pddl
+    python -m causal_cycles.cli files/tpp/domain.pddl --html-dir /tmp/graphs
     python -m causal_cycles.cli files/ --recursive --dot-dir /tmp/dots
 """
 from __future__ import annotations
@@ -12,6 +13,7 @@ from pathlib import Path
 from typing import List
 
 from causal_cycles.graph import DiGraph
+from causal_cycles.html_render import render_html
 from causal_cycles.influence_graph import build_influence_graph_from_file
 
 
@@ -71,6 +73,11 @@ def main(argv: List[str] = None) -> int:
     parser.add_argument("-r", "--recursive", action="store_true", help="recurse into directories")
     parser.add_argument("-v", "--verbose", action="store_true", help="print every influence edge")
     parser.add_argument("--dot-dir", help="write a Graphviz .dot file per domain into this directory")
+    parser.add_argument(
+        "--html-dir",
+        help="write a self-contained, interactive .html visualization per domain into this directory "
+             "(no graphviz required - open it directly in a browser)",
+    )
     parser.add_argument("--fail-on-cycle", action="store_true", help="exit 1 if any domain has a cycle")
     args = parser.parse_args(argv)
 
@@ -81,6 +88,8 @@ def main(argv: List[str] = None) -> int:
 
     if args.dot_dir:
         Path(args.dot_dir).mkdir(parents=True, exist_ok=True)
+    if args.html_dir:
+        Path(args.html_dir).mkdir(parents=True, exist_ok=True)
 
     any_cycle = False
     for path in domain_files:
@@ -91,6 +100,11 @@ def main(argv: List[str] = None) -> int:
         if args.dot_dir:
             dot_path = Path(args.dot_dir) / f"{path.stem}.dot"
             dot_path.write_text(graph.to_dot(name=path.stem.replace("-", "_")))
+
+        if args.html_dir:
+            html_path = Path(args.html_dir) / f"{path.stem}.html"
+            html_path.write_text(render_html(graph, title=path.stem))
+            print(f"  wrote {html_path}")
 
     if args.fail_on_cycle and any_cycle:
         return 1

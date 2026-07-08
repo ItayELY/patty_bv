@@ -91,14 +91,36 @@ class DiGraph:
         cycles.extend([n] for n in self.self_loops())
         return cycles
 
+    def cyclic_nodes(self) -> Set[str]:
+        return {n for c in self.cycles() for n in c}
+
+    def cyclic_edges(self) -> Set[Tuple[str, str]]:
+        """Edges that lie on an actual cycle (both endpoints in the *same*
+        non-trivial SCC, or a self-loop) - stricter than "both endpoints are
+        cyclic somewhere", which would wrongly span two disjoint cycles."""
+        comps = self.strongly_connected_components()
+        comp_of: Dict[str, int] = {}
+        comp_size: Dict[int, int] = {}
+        for i, comp in enumerate(comps):
+            comp_size[i] = len(comp)
+            for n in comp:
+                comp_of[n] = i
+
+        result = set()
+        for (s, t) in self.edges:
+            if s == t or (comp_of.get(s) == comp_of.get(t) and comp_size[comp_of[s]] > 1):
+                result.add((s, t))
+        return result
+
     def to_dot(self, name: str = "influence") -> str:
-        cyclic_nodes = {n for c in self.cycles() for n in c}
+        cyclic_nodes = self.cyclic_nodes()
+        cyclic_edges = self.cyclic_edges()
         lines = [f"digraph {name} {{", "  rankdir=LR;"]
         for n in sorted(self.nodes):
             color = ' color="red" fontcolor="red"' if n in cyclic_nodes else ""
             lines.append(f'  "{n}"[{color.strip()}];' if color else f'  "{n}";')
         for (s, t), labels in sorted(self.edges.items()):
-            cyclic_edge = s in cyclic_nodes and t in cyclic_nodes
+            cyclic_edge = (s, t) in cyclic_edges
             attrs = []
             if labels:
                 attrs.append(f'label="{", ".join(sorted(labels))}"')
