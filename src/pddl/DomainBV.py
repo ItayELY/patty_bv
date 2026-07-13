@@ -36,11 +36,32 @@ class Domain:
         self.constants = set()
         pass
 
+    def __staticPredicateNames(self) -> Set[str]:
+        """Predicate names never touched by any action/event/process's effects.
+
+        Their truth value in the initial state holds in every reachable state, so
+        they can be used to safely prune grounding without a reachability analysis.
+        """
+        modified = set()
+        referenced = set()
+        for op in self.actions | self.events | self.processes:
+            for atom in op.getAddList() | op.getDelList():
+                modified.add(atom.name)
+            for atom in op.getPredicates():
+                referenced.add(atom.name)
+
+        return referenced - modified
+
     def ground(self, problem: Problem, avoidSimplification=False) -> GroundedDomain:
 
-        gActions: Set[Action] = set([g for action in self.actions for g in action.ground(problem)])
-        gEvents: Set[Event] = set([g for event in self.events for g in event.ground(problem)])
-        gProcess: Set[Process] = set([g for process in self.processes for g in process.ground(problem)])
+        staticPredicates = self.__staticPredicateNames()
+
+        gActions: Set[Action] = set(
+            [g for action in self.actions for g in action.ground(problem, staticPredicates)])
+        gEvents: Set[Event] = set(
+            [g for event in self.events for g in event.ground(problem, staticPredicates)])
+        gProcess: Set[Process] = set(
+            [g for process in self.processes for g in process.ground(problem, staticPredicates)])
 
         gDomain = GroundedDomain(self.name, gActions, gEvents, gProcess)
 

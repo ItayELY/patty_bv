@@ -120,27 +120,78 @@ class Operation:
     def __addEffects(self, node: p.OpEffectContext):
         self.effects = Effects.fromNode(node.getChild(1))
 
-    def getCombinations(self, problem: Problem) -> List[Dict[str, str]]:
-        subs: List[List[str]] = list()
+    def getCombinations(self, problem: Problem, staticPredicates: Set[str] = None) -> List[Dict[str, str]]:
+        paramNames = [parameter.name for parameter in self.parameters]
+        paramIndex = {name: i for i, name in enumerate(paramNames)}
+
+        typeDomains: List[List[str]] = list()
         for parameter in self.parameters:
             pSubs = list()
             for childType in parameter.type.getMeAndMyChildren():
                 if childType.name not in problem.objectsByType:
                     continue
                 pSubs += problem.objectsByType[childType.name]
-            subs.append(pSubs)
+            typeDomains.append(pSubs)
+
+        # Group parameters that are jointly constrained by a precondition over a
+        # *static* predicate (never appears in any operation's add/del list, so its
+        # truth value in the initial state holds in every reachable state), and use
+        # that predicate's initial-state extension instead of a blind type-based
+        # cross product. This is a safe/sound restriction: a static precondition that
+        # is false in the initial state can never become true, so any grounding whose
+        # arguments aren't in the extension can never be applicable.
+        groups: List[List[str]] = list()
+        groupValues: List[List[tuple]] = list()
+        covered: Set[str] = set()
+
+        joinAtoms = []
+        for clause in self.preconditions:
+            if not isinstance(clause, Literal) or clause.sign != "+":
+                continue
+            atom = clause.getAtom()
+            if not staticPredicates or atom.name not in staticPredicates:
+                continue
+            args = atom.attributes
+            if not args or len(set(args)) != len(args) or not all(a in paramIndex for a in args):
+                continue
+            joinAtoms.append(atom)
+
+        joinAtoms.sort(key=lambda a: -len(a.attributes))
+
+        for atom in joinAtoms:
+            args = atom.attributes
+            if any(a in covered for a in args):
+                continue
+            extension = [
+                tuple(fact.getAtom().attributes)
+                for fact in problem.init.assignments
+                if isinstance(fact, Literal) and fact.sign == "+" and fact.getAtom().name == atom.name
+                   and len(fact.getAtom().attributes) == len(args)
+            ]
+            if not extension:
+                return []
+            groups.append(args)
+            groupValues.append(extension)
+            covered.update(args)
+
+        for name in paramNames:
+            if name in covered:
+                continue
+            groups.append([name])
+            groupValues.append([(v,) for v in typeDomains[paramIndex[name]]])
 
         combinations: List[Dict[str, str]] = list()
-        for sub in itertools.product(*subs):
+        for choice in itertools.product(*groupValues):
             comb: Dict[str, str] = dict()
-            for i, parameter in enumerate(self.parameters):
-                comb[parameter.name] = sub[i]
+            for group, values in zip(groups, choice):
+                for name, val in zip(group, values):
+                    comb[name] = val
             combinations.append(comb)
 
         return combinations
 
-    def getGroundedOperations(self, problem):
-        combinations: List[Dict[str, str]] = self.getCombinations(problem)
+    def getGroundedOperations(self, problem, staticPredicates: Set[str] = None):
+        combinations: List[Dict[str, str]] = self.getCombinations(problem, staticPredicates)
         gOperations = []
         for subs in combinations:
             name = self.__getGroundedName(subs)
