@@ -18,7 +18,7 @@ from classes.Result import Result
 PLANNERS: Dict[str, Planner] = {
     "PATTY": Patty("PATTY", "arp", solver="cvc5", encoding="non-linear"),
     "PATTY-BV": pattyBV("PATTY-BV", "arpg", solver="bitwuzla", encoding="non-linear"),
-    "ENHSP": ENHSP("ENHSP", "arpg", solver="cvc5", encoding="non-linear"),}
+    "ENHSP": ENHSP("sat-hmrphj"),}
 
 
 def run_worker(worker_index: int, total_workers: int):
