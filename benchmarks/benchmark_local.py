@@ -9,15 +9,16 @@ from classes.Envs import Envs
 from classes.Patty import Patty
 from classes.pattyAllRandom import pattyAllRandom
 from classes.pattyBV import pattyBV
+from classes.ENHSP import ENHSP
 from classes.PattyItay import PattyItay
 from classes.Planner import Planner
 from classes.Result import Result
 
 
 PLANNERS: Dict[str, Planner] = {
-    "PATTY": Patty("PATTY", "random", solver="cvc5", encoding="non-linear"),
+    "PATTY": Patty("PATTY", "arp", solver="cvc5", encoding="non-linear"),
     "PATTY-BV": pattyBV("PATTY-BV", "arpg", solver="bitwuzla", encoding="non-linear"),
-}
+    "ENHSP": ENHSP("ENHSP", "arpg", solver="cvc5", encoding="non-linear"),}
 
 
 def run_worker(worker_index: int, total_workers: int):
