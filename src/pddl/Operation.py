@@ -133,18 +133,33 @@ class Operation:
                 pSubs += problem.objectsByType[childType.name]
             typeDomains.append(pSubs)
 
-        # Group parameters that are jointly constrained by a precondition over a
-        # *static* predicate (never appears in any operation's add/del list, so its
-        # truth value in the initial state holds in every reachable state), and use
-        # that predicate's initial-state extension instead of a blind type-based
-        # cross product. This is a safe/sound restriction: a static precondition that
-        # is false in the initial state can never become true, so any grounding whose
-        # arguments aren't in the extension can never be applicable.
-        groups: List[List[str]] = list()
-        groupValues: List[List[tuple]] = list()
-        covered: Set[str] = set()
+        # Group parameters that are jointly constrained by preconditions over
+        # *static* predicates (never appear in any operation's add/del list, so
+        # their truth value in the initial state holds in every reachable state),
+        # and join against those predicates' initial-state extensions instead of a
+        # blind type-based cross product. This is a safe/sound restriction: a
+        # static precondition that is false in the initial state can never become
+        # true, so any grounding whose arguments aren't in the extension can never
+        # be applicable.
+        #
+        # An atom's arguments may mix parameter variables with already-ground
+        # literals (e.g. `(pos-at ?d ?r1 i1 ?p1)` where `i1` is a constant, not a
+        # parameter) - only the variable positions are joined/grounded; the
+        # constant positions just filter which initial-state facts qualify.
+        #
+        # Multiple literals can chain together (e.g. four separate `pos-at`
+        # literals, one per ?p1..?p4, each sharing ?d/?r1 with the others): these
+        # are joined incrementally into a single table on their shared variables,
+        # so the table's row count reflects the actual number of valid tuples
+        # rather than the product of each variable's whole type domain.
+        factsByName: Dict[str, List[List[str]]] = dict()
+        for fact in problem.init.assignments:
+            if not (isinstance(fact, Literal) and fact.sign == "+"):
+                continue
+            factAtom = fact.getAtom()
+            factsByName.setdefault(factAtom.name, []).append(factAtom.attributes)
 
-        joinAtoms = []
+        remaining = []
         for clause in self.preconditions:
             if not isinstance(clause, Literal) or clause.sign != "+":
                 continue
@@ -152,27 +167,83 @@ class Operation:
             if not staticPredicates or atom.name not in staticPredicates:
                 continue
             args = atom.attributes
-            if not args or len(set(args)) != len(args) or not all(a in paramIndex for a in args):
+            varPositions = [i for i, a in enumerate(args) if a in paramIndex]
+            varArgs = [args[i] for i in varPositions]
+            if not varArgs or len(set(varArgs)) != len(varArgs):
                 continue
-            joinAtoms.append(atom)
+            remaining.append((atom.name, args, varPositions, varArgs))
 
-        joinAtoms.sort(key=lambda a: -len(a.attributes))
+        tables: List[List] = list()  # each entry: [columns: List[str], rows: List[tuple]]
+        covered: Set[str] = set()
 
-        for atom in joinAtoms:
-            args = atom.attributes
-            if any(a in covered for a in args):
-                continue
-            extension = [
-                tuple(fact.getAtom().attributes)
-                for fact in problem.init.assignments
-                if isinstance(fact, Literal) and fact.sign == "+" and fact.getAtom().name == atom.name
-                   and len(fact.getAtom().attributes) == len(args)
-            ]
-            if not extension:
-                return []
-            groups.append(args)
-            groupValues.append(extension)
-            covered.update(args)
+        progress = True
+        while progress and remaining:
+            progress = False
+            stillRemaining = []
+            for name, args, varPositions, varArgs in remaining:
+                overlapping = [t for t in tables if set(t[0]) & set(varArgs)]
+
+                if len(overlapping) > 1:
+                    stillRemaining.append((name, args, varPositions, varArgs))
+                    continue
+
+                if not overlapping:
+                    if any(v in covered for v in varArgs):
+                        stillRemaining.append((name, args, varPositions, varArgs))
+                        continue
+                    facts = factsByName.get(name, [])
+                    rows = [
+                        tuple(f[i] for i in varPositions)
+                        for f in facts
+                        if len(f) == len(args)
+                           and all(f[i] == args[i] for i in range(len(args)) if i not in varPositions)
+                    ]
+                    if not rows:
+                        return []
+                    tables.append([list(varArgs), rows])
+                    covered.update(varArgs)
+                    progress = True
+                    continue
+
+                columns, rows = overlapping[0]
+                colIndex = {c: i for i, c in enumerate(columns)}
+                sharedPositions = []
+                newVars, newPositions = [], []
+                for i, v in zip(varPositions, varArgs):
+                    if v in colIndex:
+                        sharedPositions.append((i, colIndex[v]))
+                    else:
+                        newVars.append(v)
+                        newPositions.append(i)
+
+                if any(v in covered for v in newVars):
+                    stillRemaining.append((name, args, varPositions, varArgs))
+                    continue
+
+                facts = factsByName.get(name, [])
+                joinedRows = []
+                for row in rows:
+                    for f in facts:
+                        if len(f) != len(args):
+                            continue
+                        if any(f[i] != args[i] for i in range(len(args)) if i not in varPositions):
+                            continue
+                        if any(f[i] != row[ci] for i, ci in sharedPositions):
+                            continue
+                        joinedRows.append(row + tuple(f[i] for i in newPositions))
+
+                if not joinedRows:
+                    return []
+
+                overlapping[0][0] = columns + newVars
+                overlapping[0][1] = joinedRows
+                covered.update(newVars)
+                progress = True
+
+            remaining = stillRemaining
+
+        groups: List[List[str]] = [columns for columns, rows in tables]
+        groupValues: List[List[tuple]] = [rows for columns, rows in tables]
 
         for name in paramNames:
             if name in covered:

@@ -22,7 +22,7 @@ pddlDoc : domain | problem;
 
 /************* DOMAINS ****************************/
 
-domain : LP 'define' domainName requirements? types? predicates? functions? (action | event | process)* RP;
+domain : LP 'define' domainName requirements? types? constants? predicates? functions? (action | event | process)* RP;
 
 //DOMAIN NAME
 domainName: LP 'domain' NAME RP;
@@ -36,6 +36,9 @@ parentType: '-' typeName;
 typeName: NAME;
 type: typeName+ parent=parentType*;
 types: LP ':types' type+ RP;
+
+//CONSTANTS
+constants: LP ':constants' typedObjects* RP;
 
 //ATOM AND LITERALS
 atomName: NAME;

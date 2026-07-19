@@ -53,14 +53,14 @@
 		:parameters(?t1 - time ?n1 - turnvalue)
 		:precondition (and
 			(timenow ?t1)
-			(>= (funds) (+ (value ?n1) (/ (value ?n1) 20)))
+			(>= (funds) (* 1.05 (value ?n1)))
 			(>= (stored_capacity) 1)
 			(demand ?t1 ?n1)
 		)
 		:effect( and
 			(increase (stored_units) 1)
 			(decrease (stored_capacity) 1)
-			(decrease (funds) (+ (value ?n1) (/ (value ?n1) 20)))
+			(decrease (funds) (* 1.05 (value ?n1)))
 		)
 	)
 

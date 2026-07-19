@@ -33,8 +33,17 @@ class Domain:
         self.processes = set()
         self.events = set()
         self.requirements = list()
-        self.constants = set()
+        self.constants: Dict[str, List[str]] = dict()
         pass
+
+    def __mergeConstantsIntoProblem(self, problem: Problem):
+        """Domain-level (:constants ...) objects are available to every problem
+        grounded against this domain, exactly like problem-level (:objects ...)."""
+        for typeName, names in self.constants.items():
+            existing = problem.objectsByType.setdefault(typeName, [])
+            for name in names:
+                if name not in existing:
+                    existing.append(name)
 
     def __staticPredicateNames(self) -> Set[str]:
         """Predicate names never touched by any action/event/process's effects.
@@ -54,6 +63,7 @@ class Domain:
 
     def ground(self, problem: Problem, avoidSimplification=False) -> GroundedDomain:
 
+        self.__mergeConstantsIntoProblem(problem)
         staticPredicates = self.__staticPredicateNames()
 
         gActions: Set[Action] = set(
@@ -114,6 +124,8 @@ class Domain:
                 domain.__setRequirementsList(child)
             elif isinstance(child, pddlParser.TypesContext):
                 domain.__setTypesList(child)
+            elif isinstance(child, pddlParser.ConstantsContext):
+                domain.__setConstants(child)
             elif isinstance(child, pddlParser.PredicatesContext):
                 domain.__setPredicates(child)
             elif isinstance(child, pddlParser.FunctionsContext):
@@ -166,6 +178,20 @@ class Domain:
                     parent.addChild(self.types[name])
 
         pass
+
+    def __setConstants(self, node: pddlParser.ConstantsContext):
+        for typeNode in node.children:
+            if not isinstance(typeNode, pddlParser.TypedObjectsContext):
+                continue
+            typeStr: str = ""
+            names = []
+            for child in typeNode.children:
+                if isinstance(child, pddlParser.GroundAtomParameterContext):
+                    names.append(child.getText())
+                elif isinstance(child, pddlParser.TypeNameContext):
+                    typeStr = child.getText()
+            self.constants.setdefault(typeStr, [])
+            self.constants[typeStr].extend(names)
 
     def __setPredicates(self, node: pddlParser.PredicatesContext):
         for child in node.children:
