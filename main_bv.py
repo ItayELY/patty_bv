@@ -1,5 +1,19 @@
-import random
+import os
 import sys
+
+# Pin the hash seed before anything else runs. Domain/GroundedDomain and the SMT
+# encoders iterate plain Python sets (predicates, functions, actions, ...), whose
+# order depends on PYTHONHASHSEED; an unpinned (randomized-by-default) seed means
+# the same problem gets asserted to the solver in a different clause order on
+# every run, and CDCL solvers are sensitive enough to that ordering for solve
+# time to swing wildly between runs of the identical formula. Re-exec once with
+# a fixed seed so results are reproducible - it can't be set after the
+# interpreter has already started.
+if os.environ.get("PYTHONHASHSEED") != "0":
+    os.environ["PYTHONHASHSEED"] = "0"
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+
+import random
 import traceback
 from typing import List
 

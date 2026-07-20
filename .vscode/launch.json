@@ -11,9 +11,9 @@
             "console": "integratedTerminal",
             "args": [
                 "-o",
-                "files/ipc2026-dataset-main/petri-net/domain.pddl",
+                "files_itay/farmland/domain.pddl",
                 "-f",
-                "files/ipc2026-dataset-main/petri-net/instances/prob06-1.pddl",
+                "files_itay/farmland/instances/instance_6_400_1229.pddl",
                 "--pattern",
                 "arpg",
                 "--save-smt", "file_smt",

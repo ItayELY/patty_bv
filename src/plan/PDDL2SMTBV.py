@@ -82,13 +82,26 @@ def _compute_max_actions(problem):
     return max_val
 
 
-def _compute_min_width(domain, problem, effect_scale, goal_scale):
+def _compute_min_width(domain, problem, effect_scale, goal_scale, max_actions=1):
     """Compute BV width to hold state values and goal-scaled constants.
 
     State variables are scaled by effect_scale.  Goal constants (coefficients
     and RHS thresholds) are scaled by goal_scale.  The worst-case BV value is
     the larger of the max goal-scaled constant and the max state value; one
     extra bit is added for intermediate sums.
+
+    Repeatable actions (Operation.couldBeRepeated) are batched into a single
+    "repeat count" variable rather than unrolled step-by-step, and their own
+    precondition is checked via interval arithmetic: the extrapolated state
+    after (count - 1) repetitions is computed as
+    ``delta + effect_amount * (count - 1)`` (getPreStepRules/getDeltaStepRules).
+    That multiplication is itself a fixed-width BV value - if effect_amount *
+    max_actions overflows the chosen width, it silently wraps, and an
+    otherwise-impossible repeat count can appear to satisfy a precondition
+    purely because the wrapped value happens to land back in range. Budgeting
+    for that product (using the largest constant anywhere as a safe upper
+    bound on any single effect's magnitude) keeps the interval-arithmetic
+    extrapolation sound.
     """
     ec = _effect_consts(domain, problem)
     gc = []
@@ -99,8 +112,9 @@ def _compute_min_width(domain, problem, effect_scale, goal_scale):
 
     max_state = max((abs(Fraction(str(v)) * effect_scale) for v in ec), default=Fraction(1))
     max_goal = max((abs(Fraction(str(v)) * goal_scale) for v in gc), default=Fraction(1))
+    max_repeat_delta = max_state * max_actions
 
-    max_val = int(max(max_state, max_goal))
+    max_val = int(max(max_state, max_goal, max_repeat_delta))
     if max_val < 1:
         return 15
 
@@ -137,7 +151,8 @@ class PDDL2SMTBV:
         self.goal_scale = _compute_scale_factor(ec + gc)
         # Legacy alias used in a few internal paths
         self.scale_factor = self.goal_scale
-        self.width = width if width is not None else _compute_min_width(domain, problem, self.effect_scale, self.goal_scale)
+        max_repeat_count = self.rollBound if self.rollBound else self.max_actions
+        self.width = width if width is not None else _compute_min_width(domain, problem, self.effect_scale, self.goal_scale, max_repeat_count)
         # action counts are small (bounded by max_actions); use a narrow BV to keep solver fast
         self.action_width = max(int(self.max_actions + 1).bit_length() + 1, 8)
 
