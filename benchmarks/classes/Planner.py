@@ -18,18 +18,33 @@ class Planner:
         r.solver = self.name
         r.code = code
         r.cmd = cmd
-        r.timeout = code == 124
-        r.solved = code == 0
         r.stdout = stdout
         self.parseOutput(r, stdout)
-        if not r.timeout and r.solved:
+
+        # main.py/main_bv.py only print "Overall: Xms" once their search loop exits
+        # on its own (plan found, or every bound up to bMax exhausted). If that line
+        # never shows up, the process was cut off mid-search - whether by the
+        # `timeout` wrapper (exit 124), an OOM-kill/segfault (some other
+        # signal-derived exit code), or an uncaught exception. All of these mean "we
+        # don't know if this instance is solvable at a higher bound", i.e. a timeout
+        # from the benchmark's point of view - not a genuine "exhausted the search
+        # space and found nothing" (the only case where solved == False should be
+        # trusted at face value). Relying on code == 124 alone previously misfiled
+        # these as ordinary failures with a bogus time of 0.
+        if r.solved:
             return r
-        if not r.timeout and not r.solved:
-            print(r.stdout)
-            # logger.error(r.toJSON())
-        else:
+
+        if "Overall:" not in stdout:
+            if code != 124:
+                print(f"[{self.name}] {problemFile}: cut off before completion with "
+                      f"unexpected exit code {code} (expected 124 for a clean timeout)")
+                print(r.stdout)
+            r.timeout = True
             r.solved = False
             r.time = timeout * 1000
+            return r
+
+        print(r.stdout)
         return r
 
     def exec(self, domain: str, problem: str, timeout: int) -> (str, int):

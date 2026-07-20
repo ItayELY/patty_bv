@@ -1,4 +1,5 @@
 import random
+import sys
 import traceback
 from typing import List
 
@@ -140,6 +141,7 @@ def main():
 
     except Exception:
         traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == '__main__':

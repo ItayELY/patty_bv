@@ -34,7 +34,10 @@ class Effects:
         if isinstance(node.getChild(0), p.AndEffectContext):
             nodes.extend([n.getChild(0) for n in node.getChild(0).children[2:-1]])
         else:
-            nodes.append(node.getChild(0))
+            # A single, non-'and'-wrapped effect (e.g. ":effect (hasbananas)"): node
+            # is EffectsContext -> effect (EffectContext) -> booleanLiteral/modification,
+            # so unwrap one more level to match the 'and' branch above.
+            nodes.append(node.getChild(0).getChild(0))
 
         for n in nodes:
             if isinstance(n, p.BooleanLiteralContext):

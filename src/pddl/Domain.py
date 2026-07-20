@@ -27,6 +27,11 @@ class Domain:
 
     def __init__(self):
         self.types = dict()
+        # Untyped parameters/constants/objects (no ':typing' requirement, or just a
+        # bare '?x' with no '- type' suffix) are bucketed under this synthetic
+        # "" type, matching how Problem.__addObjects and Domain.__setConstants
+        # already default an absent type name to "".
+        self.types[""] = Type("")
         self.predicates = set()
         self.functions = set()
         self.actions = set()

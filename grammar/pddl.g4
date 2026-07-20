@@ -44,7 +44,7 @@ constants: LP ':constants' typedObjects* RP;
 atomName: NAME;
 groundAtomParameter: NAME;
 liftedAtomParameter: VAR;
-typedAtomParameter: liftedAtomParameter+ '-' atomsType=typeName;
+typedAtomParameter: liftedAtomParameter+ ('-' atomsType=typeName)?;
 atomParameter: liftedAtomParameter | groundAtomParameter ;
 
 atom: atomName atomParameter*;
@@ -127,7 +127,7 @@ problemName: LP 'problem' NAME RP;
 problemDomain: LP ':domain' NAME RP;
 
 //Objects
-typedObjects: groundAtomParameter+ '-' typeName;
+typedObjects: groundAtomParameter+ ('-' typeName)?;
 objects: LP ':objects' typedObjects* RP;
 
 //Init

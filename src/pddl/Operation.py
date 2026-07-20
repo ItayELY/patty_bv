@@ -104,8 +104,9 @@ class Operation:
             if not isinstance(child, p.TypedAtomParameterContext):
                 continue
             varNames = []
+            typeName = child.atomsType.getText() if child.atomsType else ""
             try:
-                varType = types[child.atomsType.getText()]
+                varType = types[typeName]
             except: continue
             for x in child.children:
                 if isinstance(x, p.LiftedAtomParameterContext):
