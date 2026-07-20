@@ -31,10 +31,14 @@ class Planner:
         # space and found nothing" (the only case where solved == False should be
         # trusted at face value). Relying on code == 124 alone previously misfiled
         # these as ordinary failures with a bogus time of 0.
+        #
+        # Each planner prints its own "run finished cleanly" marker (see
+        # completionMarkers()), since not every planner shares PATTY's "Overall:"
+        # convention.
         if r.solved:
             return r
 
-        if "Overall:" not in stdout:
+        if not any(marker in stdout for marker in self.completionMarkers()):
             if code != 124:
                 print(f"[{self.name}] {problemFile}: cut off before completion with "
                       f"unexpected exit code {code} (expected 124 for a clean timeout)")
@@ -82,6 +86,10 @@ class Planner:
 
     def getCommand(self, domain: str, problem: str) -> [str]:
         raise NotImplemented()
+
+    @staticmethod
+    def completionMarkers() -> [str]:
+        return ["Overall:"]
 
     @staticmethod
     def parseOutput(r: Result, stdout: str):
