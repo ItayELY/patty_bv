@@ -26,6 +26,7 @@ planner_sandbox/
 # Python environments
 .venv/
 venv/
+**/venv/
 
 # Large data files
 *.zip
