@@ -67,14 +67,84 @@ def _effect_consts(domain, problem):
     return consts
 
 
-def _compute_max_actions(problem):
-    """Maximum action repetitions per step: use the largest initial fluent value so
-    that a single-step plan can transfer all resources without needing many bounds."""
+def _goal_target_vals(problem, repeat_targets):
+    """Max goal-specified value for each repeat-target fluent that the goal directly
+    constrains via a simple ``(atom OP constant)`` comparison (either operand order).
+
+    Init value alone is a poor predictor of needed repeat count for an
+    accumulator-style fluent that starts at/near zero and is only ever grown by
+    repeated actions (e.g. plant-watering's ``poured``/``carrying``) -- the goal's
+    own target value for that fluent is the actual signal for how many
+    repetitions are needed.
+    """
+    vals = {}
+
+    def walk(obj):
+        if isinstance(obj, Formula):
+            for c in obj.conditions:
+                walk(c)
+        elif isinstance(obj, BinaryPredicate):
+            if isinstance(obj.lhs, Literal) and obj.lhs.atom in repeat_targets and isinstance(obj.rhs, Constant):
+                vals[obj.lhs.atom] = max(vals.get(obj.lhs.atom, 0.0), abs(float(obj.rhs.value)))
+            elif isinstance(obj.rhs, Literal) and obj.rhs.atom in repeat_targets and isinstance(obj.lhs, Constant):
+                vals[obj.rhs.atom] = max(vals.get(obj.rhs.atom, 0.0), abs(float(obj.lhs.value)))
+            else:
+                walk(obj.lhs)
+                walk(obj.rhs)
+
+    walk(problem.goal)
+    return vals
+
+
+def _compute_max_actions(domain, problem):
+    """Maximum action repetitions per step: for each fluent that a repeatable
+    action's own effect actually increments/decrements, use the largest of
+    (a) its initial value plus that action's own per-repetition effect
+    magnitude, and (b) the goal's own target value for that fluent, if any --
+    NOT the largest constant anywhere in the problem.
+
+    Scanning every numeric constant (as a prior version of this function did)
+    conflates two unrelated things: a fluent that some action repeatedly grows
+    (where a large init value is a real signal that many repetitions may be
+    needed), and a fluent that only ever appears in a precondition threshold or
+    comparison (where its magnitude has nothing to do with repeat counts, e.g. a
+    distance threshold used once in a single precondition). Capping to a small
+    flat constant instead is *also* wrong: it silently drops real headroom for
+    domains that do need large single-step repeat counts, forcing many more
+    bound layers to reach the same cumulative effect and making previously-fast
+    instances time out. Restricting the scan to actual repeat-effect targets
+    keeps both cases correct. The per-repetition amount is added on top of the
+    init value (rather than used alone) so that a fluent starting at/near zero
+    still gets at least one repetition's worth of headroom; the goal value
+    covers fluents that start at zero and grow entirely from zero to a target
+    (init contributes nothing there).
+    """
+    repeat_targets = set()
+    repeat_effect_amt = {}
+    for action in domain.actions:
+        if not action.couldBeRepeated():
+            continue
+        repeat_targets |= action.getIncrList() | action.getDecrList()
+        for rhs_dict in (action.getIncreases(), action.getDecreases()):
+            for atom, rhs in rhs_dict.items():
+                consts = []
+                _collect_consts(rhs, consts)
+                if consts:
+                    amt = max(abs(float(str(c))) for c in consts)
+                    repeat_effect_amt[atom] = max(repeat_effect_amt.get(atom, 0.0), amt)
+
     max_val = 50
+    if not repeat_targets:
+        return max_val
+
+    goal_vals = _goal_target_vals(problem, repeat_targets)
     for fact in problem.init:
-        if isinstance(fact, BinaryPredicate) and fact.operator in ("=", "assign"):
+        if isinstance(fact, BinaryPredicate) and fact.operator in ("=", "assign") \
+                and fact.getAtom() in repeat_targets:
             try:
-                v = abs(float(str(fact.rhs)))
+                atom = fact.getAtom()
+                v = abs(float(str(fact.rhs))) + repeat_effect_amt.get(atom, 0.0)
+                v = max(v, goal_vals.get(atom, 0.0))
                 if v > max_val:
                     max_val = int(v) + 1
             except Exception:
@@ -102,6 +172,16 @@ def _compute_min_width(domain, problem, effect_scale, goal_scale, max_actions=1)
     for that product (using the largest constant anywhere as a safe upper
     bound on any single effect's magnitude) keeps the interval-arithmetic
     extrapolation sound.
+
+    NOTE: narrowing max_repeat_delta to the actual per-repetition effect
+    amount (rather than the domain-wide largest constant) was tried and
+    reverted. It is logically sound -- the interval-arithmetic term never
+    overflows either way -- but empirically caused severe regressions on
+    farmland's larger instances (6/8/10-farm cases went from solving in
+    single-digit seconds to timing out at 25s+, with no correctness gain),
+    most likely due to non-monotonic solver-internal behavior in bitwuzla's
+    bit-blasting for the narrower width rather than a flaw in the wider
+    encoding. Keep the wider, empirically fast width here.
     """
     ec = _effect_consts(domain, problem)
     gc = []
@@ -141,7 +221,7 @@ class PDDL2SMTBV:
         self.encoding = encoding
         self.rollBound = rollBound
         self.hasEffectAxioms = hasEffectAxioms
-        self.max_actions = max_actions if max_actions is not None else _compute_max_actions(problem)
+        self.max_actions = max_actions if max_actions is not None else _compute_max_actions(domain, problem)
         ec = _effect_consts(domain, problem)
         gc = []
         _collect_consts(problem.goal, gc)
