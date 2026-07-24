@@ -1,2 +1,0 @@
-#!/bin/bash
-exec conda run -n patty python /project/main_all_random.py "$@"
